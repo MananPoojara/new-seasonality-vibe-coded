@@ -1009,3 +1009,544 @@ export default function AdminPage() {
   );
 }
 ```
+
+```jsx
+'use client';
+
+import { useState, useCallback, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { uploadApi } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
+import Button from '../components/ui/Button';
+import { Card, CardContent, CardHeader } from '../components/ui/Card';
+import { Loading } from '../components/ui/loading';
+import { 
+  Upload, FileText, RefreshCw, Play, CheckCircle, XCircle, 
+  Clock, Cloud, Trash2, RotateCcw, Database, FileSpreadsheet, 
+  LogOut, Settings, Zap, Bell, Search, PlusCircle,
+  ArrowUpRight, ShieldCheck, Activity, History, UploadCloud,
+  ChevronRight, ArrowRight
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+import { cn, formatFileSize } from '../lib/utils';
+import CalculatedDataSection from '../components/admin/CalculatedDataSection';
+
+interface BatchFile {
+  id: string;
+  fileName: string;
+  status: string;
+  recordsProcessed: number;
+  error?: string;
+  processedAt?: string;
+}
+
+interface BatchStatus {
+  batchId: string;
+  status: string;
+  totalFiles: number;
+  processedFiles: number;
+  failedFiles: number;
+  pendingFiles: number;
+  progress: number;
+  files: BatchFile[];
+}
+
+export default function AdminPage() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const { user, logout, isAuthenticated } = useAuthStore();
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState('upload');
+  
+  // Standard upload state
+  const [files, setFiles] = useState<FileList | null>(null);
+  const [batchName, setBatchName] = useState('');
+  const [description, setDescription] = useState('');
+  
+  // Bulk upload state
+  const [bulkFiles, setBulkFiles] = useState<File[]>([]);
+  const [bulkBatchId, setBulkBatchId] = useState<string | null>(null);
+  const [bulkStatus, setBulkStatus] = useState<BatchStatus | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Logic: Poll for status
+  useEffect(() => {
+    if (!bulkBatchId || !isProcessing) return;
+    if (bulkStatus?.status === 'COMPLETED' || bulkStatus?.status === 'FAILED' || bulkStatus?.status === 'PARTIAL') {
+      setIsProcessing(false);
+      queryClient.invalidateQueries({ queryKey: ['upload-batches'] });
+      queryClient.invalidateQueries({ queryKey: ['upload-stats'] });
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await uploadApi.getBulkStatus(bulkBatchId);
+        if (response.data.success) {
+          setBulkStatus(response.data.data);
+          
+          if (['COMPLETED', 'FAILED', 'PARTIAL'].includes(response.data.data.status)) {
+            setIsProcessing(false);
+            queryClient.invalidateQueries({ queryKey: ['upload-batches'] });
+            queryClient.invalidateQueries({ queryKey: ['upload-stats'] });
+          }
+        }
+      } catch (err) {
+        console.error('Error polling batch status:', err);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [bulkBatchId, bulkStatus?.status, isProcessing, queryClient]);
+
+  // Logic: Fetching
+  const { data: batchesData, isLoading } = useQuery({
+    queryKey: ['upload-batches'],
+    queryFn: async () => {
+      const response = await uploadApi.listBatches();
+      return response.data;
+    },
+  });
+
+  const { data: statsData } = useQuery({
+    queryKey: ['upload-stats'],
+    queryFn: async () => {
+      const response = await uploadApi.getStats();
+      return response.data;
+    },
+  });
+
+  // Logic: Mutations
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!files || files.length === 0) throw new Error('No files selected');
+      const formData = new FormData();
+      Array.from(files).forEach((file) => formData.append('files', file));
+      formData.append('name', batchName || 'Unnamed Batch');
+      formData.append('description', description);
+      return uploadApi.createBatch(formData);
+    },
+    onSuccess: () => {
+      toast.success('Files uploaded successfully!');
+      queryClient.invalidateQueries({ queryKey: ['upload-batches'] });
+      setFiles(null);
+      setBatchName('');
+      setDescription('');
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Upload failed'),
+  });
+
+  const processMutation = useMutation({
+    mutationFn: (batchId: string) => uploadApi.processBatch(batchId),
+    onSuccess: () => {
+      toast.success('Processing started!');
+      queryClient.invalidateQueries({ queryKey: ['upload-batches'] });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Processing failed'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (batchId: string) => uploadApi.deleteBatch(batchId),
+    onSuccess: () => {
+      toast.success('Batch deleted');
+      queryClient.invalidateQueries({ queryKey: ['upload-batches'] });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Delete failed'),
+  });
+
+  // Logic: Bulk Handlers
+  const handleBulkFilesSelect = useCallback((e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] } }) => {
+    const selected = Array.from(e.target.files || []).filter(f => f.name.endsWith('.csv'));
+    if (selected.length === 0) { setError('Please select CSV files only'); return; }
+    if (selected.length > 500) { setError('Maximum 500 files per upload'); return; }
+    setBulkFiles(selected);
+    setError(null);
+  }, []);
+
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    else if (e.type === 'dragleave') setDragActive(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const dropped = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.csv'));
+      handleBulkFilesSelect({ target: { files: dropped } } as any);
+    }
+  }, [handleBulkFilesSelect]);
+
+  const uploadToMinIO = async (file: File, presignedUrl: string) => {
+    try {
+      const response = await fetch(presignedUrl, { method: 'PUT', body: file, mode: 'cors' });
+      if (!response.ok) throw new Error(`MinIO upload failed`);
+    } catch (err: any) { throw err; }
+  };
+
+  const handleBulkUpload = async () => {
+    if (bulkFiles.length === 0) { setError('Please select files first'); return; }
+    setIsUploading(true); setUploadProgress(0); setError(null); setBulkStatus(null);
+    try {
+      const presignResponse = await uploadApi.getPresignedUrls(bulkFiles.map(f => ({ name: f.name, size: f.size })));
+      if (!presignResponse.data.success) throw new Error('Failed to get URLs');
+      const { batchId, files: presignedFiles } = presignResponse.data.data;
+      let uploadedCount = 0;
+      for (const fileInfo of presignedFiles) {
+        if (fileInfo.uploadUrl) {
+          const file = bulkFiles.find(f => f.name === fileInfo.fileName);
+          if (file) await uploadToMinIO(file, fileInfo.uploadUrl);
+        }
+        uploadedCount++;
+        setUploadProgress((uploadedCount / presignedFiles.length) * 50);
+      }
+      await uploadApi.processBulk(batchId, presignedFiles.map((f: any) => f.objectKey), presignedFiles.map((f: any) => f.fileName));
+      setBulkBatchId(batchId); setIsUploading(false); setIsProcessing(true); setUploadProgress(50);
+      toast.success('Ingestion triggered');
+    } catch (err: any) {
+      setIsUploading(false); setError(err.message || 'Upload failed');
+    }
+  };
+
+  const resetBulkUpload = () => {
+    setBulkFiles([]); setBulkBatchId(null); setBulkStatus(null);
+    setIsUploading(false); setIsProcessing(false); setUploadProgress(0); setError(null);
+  };
+
+  const handleRetry = async () => {
+    if (!bulkBatchId) return;
+    try { await uploadApi.retryBulk(bulkBatchId); setIsProcessing(true); toast.success('Retrying...'); }
+    catch (err: any) { toast.error(err.message || 'Retry failed'); }
+  };
+
+  const handleLogout = () => { logout(); router.push('/login'); };
+
+  // UI Helpers
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      case 'failed': return <XCircle className="h-4 w-4 text-rose-500" />;
+      case 'processing': return <RefreshCw className="h-4 w-4 text-indigo-500 animate-spin" />;
+      default: return <Clock className="h-4 w-4 text-amber-500" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, string> = {
+      PENDING: 'bg-amber-50 text-amber-700 border-amber-100',
+      PROCESSING: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+      COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      FAILED: 'bg-rose-50 text-rose-700 border-rose-100',
+      PARTIAL: 'bg-orange-50 text-orange-700 border-orange-100',
+    };
+    return cn('px-2 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-widest', badges[status] || 'bg-slate-50 text-slate-700 border-slate-100');
+  };
+
+  const navigation = [
+    { id: 'upload', name: 'Ingest Hub', icon: UploadCloud },
+    { id: 'data', name: 'Analysis Engine', icon: Database },
+    { id: 'batches', name: 'Process Logs', icon: History },
+  ];
+
+  const batches = batchesData?.batches || [];
+  const stats = statsData?.data;
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">
+      {/* Sleek Top Navbar */}
+      <nav className="h-16 bg-white border-b border-slate-200/60 sticky top-0 z-50 px-8 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-100">
+              <Zap className="h-5 w-5 text-white fill-white" />
+            </div>
+            <span className="font-black text-slate-900 tracking-tighter text-lg uppercase">Seasonality Pro</span>
+          </div>
+          <div className="h-6 w-[1px] bg-slate-200" />
+          <div className="hidden md:flex items-center gap-1">
+            {navigation.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200",
+                  activeTab === item.id 
+                    ? "bg-slate-900 text-white shadow-md shadow-slate-200" 
+                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                )}
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <button className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
+            <Bell className="h-5 w-5" />
+          </button>
+          <div className="h-8 w-8 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-xs">
+            {user?.name?.[0] || 'A'}
+          </div>
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-500 hover:text-rose-600">
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </nav>
+
+      {/* Unique Content Layout: Centered & Sectioned */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-8 py-10 space-y-12 animate-in fade-in duration-700">
+        
+        {/* TAB: UPLOAD DATA */}
+        {activeTab === 'upload' && (
+          <div className="space-y-12">
+            {/* Minimal Stat Strip */}
+            {stats && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[
+                  { label: 'Total Tickers', val: stats.totalTickers, icon: Database, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                  { label: 'Data Entries', val: stats.totalDataEntries?.toLocaleString(), icon: FileSpreadsheet, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                  { label: 'Avg per Ticker', val: stats.averageEntriesPerTicker, icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' }
+                ].map((stat, i) => (
+                  <div key={i} className="group p-6 bg-white border border-slate-200 rounded-[2.5rem] hover:border-slate-300 transition-all shadow-sm">
+                    <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110", stat.bg, stat.color)}>
+                      <stat.icon className="h-5 w-5" />
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                    <p className="text-2xl font-black text-slate-900 tracking-tight">{stat.val}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+              {/* Unique Bulk Upload Ingestor */}
+              <div className="lg:col-span-7">
+                <div 
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  className={cn(
+                    "relative bg-white border-2 border-dashed rounded-[3rem] p-12 transition-all duration-500 group flex flex-col items-center text-center",
+                    dragActive ? "border-indigo-500 bg-indigo-50/30 scale-[0.99]" : "border-slate-200 hover:border-slate-300",
+                    isUploading && "opacity-50 pointer-events-none"
+                  )}
+                >
+                  {!bulkStatus ? (
+                    <>
+                      <div className="h-20 w-20 rounded-[2rem] bg-slate-50 border border-slate-100 flex items-center justify-center mb-8 shadow-sm">
+                        <UploadCloud className={cn("h-8 w-8", dragActive ? "text-indigo-600" : "text-slate-300")} />
+                      </div>
+                      <h4 className="text-2xl font-black text-slate-900 tracking-tight">Data Payload Ingestion</h4>
+                      <p className="text-slate-400 font-medium max-w-sm mt-2 text-sm">
+                        Drop up to 500 .CSV files into the processing pipeline for instant calculation.
+                      </p>
+
+                      <label className="mt-10 inline-block cursor-pointer">
+                        <span className="bg-slate-900 text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all block active:scale-95">Browse Filesystem</span>
+                        <input type="file" multiple accept=".csv" className="hidden" onChange={handleBulkFilesSelect} />
+                      </label>
+
+                      {bulkFiles.length > 0 && (
+                        <div className="mt-10 w-full animate-in slide-in-from-bottom-2">
+                          <div className="flex items-center justify-between px-4 mb-4">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Payload ({bulkFiles.length} blocks)</span>
+                            <button onClick={() => setBulkFiles([])} className="text-[10px] font-black text-rose-500 hover:underline uppercase tracking-widest">Clear</button>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto custom-scrollbar p-2">
+                            {bulkFiles.slice(0, 4).map((f, i) => (
+                              <div key={i} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                                <div className="flex items-center gap-3 truncate">
+                                  <FileText className="h-4 w-4 text-indigo-500" />
+                                  <span className="text-xs font-bold text-slate-700 truncate">{f.name}</span>
+                                </div>
+                                <span className="text-[10px] font-black text-slate-300 uppercase">{formatFileSize(f.size)}</span>
+                              </div>
+                            ))}
+                            {bulkFiles.length > 4 && <div className="text-center text-[10px] text-slate-400 font-bold uppercase py-2">...and {bulkFiles.length - 4} more packages</div>}
+                          </div>
+                          <Button onClick={handleBulkUpload} className="w-full mt-6 py-5 rounded-[2rem] text-lg bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100">
+                            {isUploading ? <RefreshCw className="h-5 w-5 animate-spin" /> : 'Execute Sync Sequence'}
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full text-left space-y-8 animate-in zoom-in-95 duration-500">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-xl font-black text-slate-900">Sync Engine Status</h5>
+                        <span className={getStatusBadge(bulkStatus.status)}>{bulkStatus.status}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          <span>Transmission Health</span>
+                          <span>{bulkStatus.progress.toFixed(1)}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                          <div 
+                            className={cn("h-full transition-all duration-500 shadow-lg", bulkStatus.status === 'FAILED' ? 'bg-rose-500' : 'bg-indigo-600')} 
+                            style={{ width: `${bulkStatus.progress}%` }} 
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-4">
+                        {[
+                          { label: 'Synced', val: bulkStatus.processedFiles, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                          { label: 'Failed', val: bulkStatus.failedFiles, color: 'text-rose-600', bg: 'bg-rose-50' },
+                          { label: 'Queue', val: bulkStatus.pendingFiles, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                          { label: 'Total', val: bulkStatus.totalFiles, color: 'text-slate-900', bg: 'bg-slate-50' }
+                        ].map((s, i) => (
+                          <div key={i} className={cn("p-4 rounded-3xl border border-slate-100 text-center", s.bg)}>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">{s.label}</p>
+                            <p className={cn("text-xl font-black", s.color)}>{s.val}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-center gap-4 pt-4">
+                        <Button variant="primary" className="rounded-2xl px-10" onClick={resetBulkUpload}>Ingest More</Button>
+                        {bulkStatus.status === 'PARTIAL' && <Button variant="outline" className="rounded-2xl px-10" onClick={handleRetry}>Retry Failed</Button>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Upload Side Panel: Requirements & Activity */}
+              <div className="lg:col-span-5 space-y-8">
+                <div className="bg-white border border-slate-200 rounded-[3rem] p-10 shadow-sm relative overflow-hidden">
+                  <Zap className="h-12 w-12 text-slate-50 absolute -top-4 -right-4" />
+                  <h4 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-indigo-600" />
+                    Protocol Schemas
+                  </h4>
+                  <ul className="space-y-4">
+                    {[
+                      'Strict CSV Encapsulation',
+                      'Mandatory: Date, Ticker, Close',
+                      'Calculated In-Memory (S-Engine V2)',
+                      'Atomic Write Commit enabled',
+                      'Async Parallel Processing'
+                    ].map((t, i) => (
+                      <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-600">
+                        <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-8 p-6 bg-slate-900 rounded-[2rem] text-white">
+                    <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-2">Engine Uptime</p>
+                    <div className="flex items-center justify-between">
+                       <span className="text-2xl font-black">99.98%</span>
+                       <Activity className="h-5 w-5 text-indigo-400 animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Minified History Hub */}
+                <div className="bg-white border border-slate-200 rounded-[3rem] p-10 shadow-sm">
+                  <h4 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                    <History className="h-5 w-5 text-indigo-600" />
+                    Live Activity
+                  </h4>
+                  <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                    {isLoading ? <Loading /> : batches.slice(0, 4).map((batch: any) => (
+                      <div key={batch.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:bg-white hover:border-indigo-100 transition-all">
+                        <div className="overflow-hidden">
+                          <p className="text-xs font-black text-slate-900 truncate leading-none mb-1">{batch.name || 'Auto Block'}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{batch.totalFiles} packages</p>
+                        </div>
+                        <span className={getStatusBadge(batch.status)}>{batch.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: ANALYSIS ENGINE */}
+        {activeTab === 'data' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <CalculatedDataSection />
+          </div>
+        )}
+
+        {/* TAB: PROCESS LOGS (FULL HISTORY) */}
+        {activeTab === 'batches' && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <div className="bg-white border border-slate-200 rounded-[3rem] p-12 shadow-sm">
+                <div className="flex items-center justify-between mb-10">
+                  <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">System Audit Trails</h3>
+                  <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['upload-batches'] })}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sync Archives
+                  </Button>
+                </div>
+
+                {isLoading ? <Loading /> : batches.length > 0 ? (
+                  <div className="space-y-4">
+                    {batches.map((batch: any) => (
+                      <div key={batch.id} className="group p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] hover:bg-white hover:border-indigo-200 transition-all duration-300">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                          <div className="flex items-center gap-6">
+                            <div className="h-14 w-14 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                              <Database className="h-7 w-7" />
+                            </div>
+                            <div>
+                              <h4 className="text-lg font-black text-slate-900">{batch.name || 'System Payload Ingest'}</h4>
+                              <div className="flex items-center gap-4 mt-1">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{batch.totalFiles} Files</span>
+                                <span className="h-1 w-1 rounded-full bg-slate-200" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{batch.totalRecordsProcessed?.toLocaleString() || 0} Records</span>
+                                <span className="h-1 w-1 rounded-full bg-slate-200" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(batch.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <span className={getStatusBadge(batch.status)}>{batch.status}</span>
+                            <div className="flex items-center gap-2">
+                              {batch.status === 'PENDING' && (
+                                <button onClick={() => processMutation.mutate(batch.id)} className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-xl transition-colors">
+                                  <Play className="h-5 w-5" />
+                                </button>
+                              )}
+                              <button onClick={() => deleteMutation.mutate(batch.id)} className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl transition-colors">
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-slate-300">
+                    <History className="h-16 w-16 mx-auto mb-4 opacity-10" />
+                    <p className="font-bold text-lg">No audit trails available.</p>
+                  </div>
+                )}
+             </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* Floating Action Button (Optional Unique touch) */}
+      <div className="fixed bottom-10 right-10 z-50">
+        <button className="h-16 w-16 bg-slate-900 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
+          <Settings className="h-6 w-6" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+```
