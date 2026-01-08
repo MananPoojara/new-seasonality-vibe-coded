@@ -1568,20 +1568,11 @@ import {
   Clock, Cloud, Trash2, RotateCcw, Database, FileSpreadsheet, 
   LogOut, Settings, Zap, Bell, Search, PlusCircle,
   ArrowUpRight, ShieldCheck, Activity, History, UploadCloud,
-  ChevronRight, ArrowRight, Command, LayoutGrid
+  ChevronRight, ArrowRight, LayoutGrid, Terminal, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { cn, formatPercentage, formatDate } from '../lib/utils';
+import { cn, formatPercentage, formatDate, formatFileSize } from '../lib/utils';
 import CalculatedDataSection from '../components/admin/CalculatedDataSection';
-
-// Helper for file size since it's used in the logic
-const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
 
 interface BatchFile {
   id: string;
@@ -1609,7 +1600,8 @@ export default function AdminPage() {
   const { user, logout, isAuthenticated } = useAuthStore();
   
   // Tab state
-  const [activeTab, setActiveTab] = useState('upload');
+  // Added explicit string type to prevent TypeScript from narrowing state to the literal 'upload', which prevents valid comparisons with other tab values.
+  const [activeTab, setActiveTab] = useState<string>('upload');
   
   // Standard upload state
   const [files, setFiles] = useState<FileList | null>(null);
@@ -1626,7 +1618,16 @@ export default function AdminPage() {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Logic: Poll for status
+  // LOGIC: Check admin
+  useEffect(() => {
+    if (!isAuthenticated) { router.push('/login'); return; }
+    if (user?.role !== 'admin') {
+      router.push('/');
+      toast.error('Access denied. Admin only.');
+    }
+  }, [isAuthenticated, user, router]);
+
+  // LOGIC: Poll for bulk batch status
   useEffect(() => {
     if (!bulkBatchId || !isProcessing) return;
     if (bulkStatus?.status === 'COMPLETED' || bulkStatus?.status === 'FAILED' || bulkStatus?.status === 'PARTIAL') {
@@ -1656,7 +1657,7 @@ export default function AdminPage() {
     return () => clearInterval(pollInterval);
   }, [bulkBatchId, bulkStatus?.status, isProcessing, queryClient]);
 
-  // Logic: Mutations
+  // LOGIC: Mutations
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!files || files.length === 0) throw new Error('No files selected');
@@ -1669,9 +1670,7 @@ export default function AdminPage() {
     onSuccess: () => {
       toast.success('Files uploaded successfully!');
       queryClient.invalidateQueries({ queryKey: ['upload-batches'] });
-      setFiles(null);
-      setBatchName('');
-      setDescription('');
+      setFiles(null); setBatchName(''); setDescription('');
     },
     onError: (error: any) => toast.error(error.response?.data?.message || 'Upload failed'),
   });
@@ -1694,7 +1693,7 @@ export default function AdminPage() {
     onError: (error: any) => toast.error(error.response?.data?.message || 'Delete failed'),
   });
 
-  // Logic: Bulk Handlers
+  // LOGIC: Bulk file selection
   const handleBulkFilesSelect = useCallback((e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] } }) => {
     const targetFiles = (e.target as HTMLInputElement).files;
     const selected = Array.from(targetFiles || []).filter(f => f.name.endsWith('.csv'));
@@ -1762,16 +1761,7 @@ export default function AdminPage() {
 
   const handleLogout = () => { logout(); router.push('/login'); };
 
-  // Logic: Check admin
-  useEffect(() => {
-    if (!isAuthenticated) { router.push('/login'); return; }
-    if (user?.role !== 'admin') {
-      router.push('/');
-      toast.error('Access denied. Admin only.');
-    }
-  }, [isAuthenticated, user, router]);
-
-  // Logic: Queries
+  // LOGIC: Queries
   const { data: batchesData, isLoading: batchesLoading } = useQuery({
     queryKey: ['upload-batches'],
     queryFn: async () => {
@@ -1791,10 +1781,10 @@ export default function AdminPage() {
   // UI Helpers
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'completed': return <CheckCircle className="h-3 w-3 text-emerald-500" />;
-      case 'failed': return <XCircle className="h-3 w-3 text-rose-500" />;
-      case 'processing': return <RefreshCw className="h-3 w-3 text-indigo-500 animate-spin" />;
-      default: return <Clock className="h-3 w-3 text-amber-500" />;
+      case 'completed': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      case 'failed': return <XCircle className="h-4 w-4 text-rose-500" />;
+      case 'processing': return <RefreshCw className="h-4 w-4 text-indigo-500 animate-spin" />;
+      default: return <Clock className="h-4 w-4 text-amber-500" />;
     }
   };
 
@@ -1806,40 +1796,36 @@ export default function AdminPage() {
       FAILED: 'bg-rose-50 text-rose-700 border-rose-100',
       PARTIAL: 'bg-orange-50 text-orange-700 border-orange-100',
     };
-    return cn('px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-widest', badges[status] || 'bg-slate-50 text-slate-700 border-slate-100');
+    return cn('px-2 py-0.5 rounded-full text-[10px] font-black border uppercase tracking-widest', badges[status] || 'bg-slate-50 text-slate-700 border-slate-100');
   };
 
   const navigation = [
-    { id: 'upload', name: 'Ingest', icon: UploadCloud },
-    { id: 'data', name: 'Engine', icon: Database },
-    { id: 'batches', name: 'Logs', icon: History },
+    { id: 'upload', name: 'Ingest Hub', icon: UploadCloud },
+    { id: 'data', name: 'Analytics', icon: Database },
+    { id: 'batches', name: 'History', icon: History },
   ];
 
-  // Fix: Define 'batches' and 'stats' from query data to be used in the JSX below
-  const batches = batchesData?.data || [];
   const stats = statsData?.data;
+  const batches = batchesData?.batches || [];
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] flex flex-col font-sans selection:bg-indigo-100">
-      {/* Top Professional Banner */}
-      <header className="h-20 bg-white border-b border-slate-200/60 px-10 flex items-center justify-between sticky top-0 z-40 backdrop-blur-xl bg-white/80">
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg shadow-slate-200">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans selection:bg-indigo-100 pb-24">
+      {/* Sleek Header */}
+      <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-40 px-10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-slate-900 p-2 rounded-xl shadow-lg shadow-slate-200">
             <Zap className="h-5 w-5 text-indigo-400 fill-indigo-400" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tighter uppercase">Seasonality Hub</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Administrative Node</p>
+            <h1 className="text-xl font-black text-slate-900 tracking-tighter uppercase leading-none">Admin Node</h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Seasonality Engine</p>
           </div>
         </div>
 
         <div className="flex items-center gap-6">
-          <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-100 rounded-2xl">
-            <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Operational</span>
-          </div>
-          <div className="h-10 w-10 rounded-full border-2 border-indigo-100 bg-indigo-50 flex items-center justify-center text-indigo-700 font-black text-xs">
-            {user?.name?.[0] || 'A'}
+          <div className="hidden sm:flex flex-col text-right">
+            <span className="text-sm font-black text-slate-900">{user?.name}</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{user?.role}</span>
           </div>
           <Button variant="ghost" size="icon" onClick={handleLogout} className="text-slate-400 hover:text-rose-500">
             <LogOut className="h-5 w-5" />
@@ -1848,173 +1834,207 @@ export default function AdminPage() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-10 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+      <main className="max-w-7xl w-full mx-auto p-10 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
         
-        {/* Statistics Row - Sleek Micro Cards */}
+        {/* Statistics Signal Strip */}
         {activeTab === 'upload' && stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { label: 'Network Tickers', val: stats.totalTickers, icon: Database, color: 'text-indigo-600' },
-              { label: 'Data Datasets', val: stats.totalDataEntries?.toLocaleString(), icon: FileSpreadsheet, color: 'text-emerald-600' },
-              { label: 'Ticker Density', val: stats.averageEntriesPerTicker, icon: Zap, color: 'text-amber-600' }
+              { label: 'Network Tickers', val: stats.totalTickers, icon: Database, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+              { label: 'Active Entries', val: stats.totalDataEntries?.toLocaleString(), icon: FileSpreadsheet, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+              { label: 'Avg Density', val: stats.averageEntriesPerTicker, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' }
             ].map((s, i) => (
-              <div key={i} className="bg-white border border-slate-200/60 p-6 rounded-[2rem] flex items-center justify-between group hover:border-indigo-100 transition-all shadow-sm">
-                <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{s.label}</p>
-                  <p className="text-2xl font-black text-slate-900 font-mono tracking-tighter">{s.val}</p>
-                </div>
-                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center opacity-40 group-hover:opacity-100 transition-opacity bg-slate-50", s.color)}>
+              <div key={i} className="group p-8 bg-white border border-slate-200/60 rounded-[2.5rem] hover:border-indigo-100 transition-all shadow-sm">
+                <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110", s.bg, s.color)}>
                   <s.icon className="h-5 w-5" />
                 </div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{s.label}</p>
+                <p className="text-3xl font-black text-slate-900 tracking-tighter">{s.val}</p>
               </div>
             ))}
           </div>
         )}
 
-        {/* Tab Content Rendering */}
-        <section className="min-h-[60vh]">
-          {activeTab === 'upload' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              {/* Ingestion Module */}
-              <div className="lg:col-span-7">
-                <div 
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  className={cn(
-                    "relative h-[500px] border-2 border-dashed rounded-[3rem] p-12 transition-all duration-700 flex flex-col items-center justify-center text-center",
-                    dragActive ? "border-indigo-500 bg-indigo-50/20 scale-[0.99] shadow-inner" : "border-slate-200 bg-white hover:border-slate-300 shadow-sm",
-                    isUploading && "opacity-60 pointer-events-none"
-                  )}
-                >
-                  {!bulkStatus ? (
-                    <div className="space-y-6 max-w-md">
-                      <div className="h-24 w-24 mx-auto rounded-[2.5rem] bg-slate-50 border border-slate-100 flex items-center justify-center shadow-lg shadow-slate-200/50 group-hover:scale-110 transition-transform duration-500">
-                        <UploadCloud className={cn("h-10 w-10", dragActive ? "text-indigo-600" : "text-slate-300")} />
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="text-2xl font-black text-slate-900 tracking-tighter uppercase italic">Data Ingestion Engine</h4>
-                        <p className="text-slate-400 font-medium text-sm leading-relaxed px-10">
-                          Transfer up to 500 CSV records directly to the seasonality mainframe for analysis.
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col items-center gap-6">
-                        <label className="cursor-pointer group">
-                          <span className="bg-slate-900 text-white px-12 py-5 rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-2xl shadow-slate-300 hover:bg-slate-800 transition-all block active:scale-95">
-                            Select Payload
-                          </span>
-                          <input type="file" multiple accept=".csv" className="hidden" onChange={handleBulkFilesSelect} />
-                        </label>
-                        
-                        {bulkFiles.length > 0 && (
-                          <div className="animate-in fade-in zoom-in-95 duration-500 w-full space-y-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
-                              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{bulkFiles.length} Blocks Prepared</span>
-                            </div>
-                            <Button 
-                              onClick={handleBulkUpload} 
-                              className="w-full py-6 rounded-[2.5rem] bg-indigo-600 hover:bg-indigo-700 text-lg shadow-xl shadow-indigo-100"
-                              isLoading={isUploading}
-                            >
-                              Commence Sync
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+        {/* Tab Sections */}
+        {activeTab === 'upload' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            {/* The Ingestor */}
+            <div className="lg:col-span-7 space-y-8">
+              <div 
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                className={cn(
+                  "relative border-4 border-dashed rounded-[3rem] p-12 transition-all duration-500 group flex flex-col items-center justify-center text-center bg-white min-h-[450px]",
+                  dragActive ? "border-indigo-500 bg-indigo-50/30 scale-[0.99]" : "border-slate-200 hover:border-slate-300",
+                  isUploading && "opacity-60 pointer-events-none"
+                )}
+              >
+                {!bulkStatus ? (
+                  <>
+                    <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 border border-slate-100 flex items-center justify-center mb-8 shadow-sm group-hover:scale-110 transition-transform">
+                      <UploadCloud className={cn("h-10 w-10", dragActive ? "text-indigo-600" : "text-slate-300")} />
                     </div>
-                  ) : (
-                    /* High-End Processing Visualizer */
-                    <div className="w-full h-full text-left flex flex-col justify-center space-y-10 animate-in fade-in duration-500">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pipeline State</p>
-                          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">{bulkStatus.status}</h3>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Transmission</p>
-                           <p className="text-4xl font-black text-indigo-600 tracking-tighter">{bulkStatus.progress.toFixed(0)}%</p>
-                        </div>
-                      </div>
+                    <h4 className="text-2xl font-black text-slate-900 tracking-tight">Data Payload Ingestion</h4>
+                    <p className="text-slate-400 font-medium max-w-sm mt-2 text-sm">
+                      Sync multiple CSV records (max 500) directly with the seasonality mainframe.
+                    </p>
 
-                      <div className="h-4 w-full bg-slate-50 rounded-full border border-slate-100 overflow-hidden shadow-inner">
+                    <label className="mt-10 inline-block cursor-pointer">
+                      <span className="bg-slate-900 text-white px-12 py-5 rounded-[2.2rem] text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all block active:scale-95">Browse Datasets</span>
+                      <input type="file" multiple accept=".csv" className="hidden" id="bulk-file-upload" onChange={handleBulkFilesSelect} />
+                    </label>
+
+                    {bulkFiles.length > 0 && (
+                      <div className="mt-10 w-full animate-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex items-center justify-between px-6 mb-4">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{bulkFiles.length} Blocks Prepared</span>
+                          <button onClick={() => setBulkFiles([])} className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Clear</button>
+                        </div>
+                        <div className="max-h-40 overflow-y-auto custom-scrollbar px-2 space-y-2">
+                          {bulkFiles.slice(0, 5).map((f, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl">
+                              <span className="text-xs font-bold text-slate-700 truncate max-w-[200px]">{f.name}</span>
+                              <span className="text-[10px] font-black text-slate-300 uppercase">{formatFileSize(f.size)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <Button 
+                          onClick={handleBulkUpload} 
+                          className="w-full mt-6 py-6 rounded-[2.2rem] text-lg bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100"
+                        >
+                          Execute Payload Sync
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Live Sync Engine Visualizer */
+                  <div className="w-full text-left space-y-10 animate-in zoom-in-95 duration-500">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">Sync In-Progress</h5>
+                      <span className={getStatusBadge(bulkStatus.status)}>{bulkStatus.status}</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <span>Transmission Throughput</span>
+                        <span>{bulkStatus.progress.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
                         <div 
-                          className={cn(
-                            "h-full transition-all duration-700 shadow-[0_0_20px_rgba(79,70,229,0.3)]",
-                            bulkStatus.status === 'FAILED' ? 'bg-rose-500' : 'bg-indigo-600'
-                          )}
-                          style={{ width: `${bulkStatus.progress}%` }}
+                          className={cn("h-full transition-all duration-700 shadow-[0_0_20px_rgba(79,70,229,0.3)]", bulkStatus.status === 'FAILED' ? 'bg-rose-500' : 'bg-indigo-600')} 
+                          style={{ width: `${bulkStatus.progress}%` }} 
                         />
                       </div>
-
-                      <div className="grid grid-cols-4 gap-4">
-                        {[
-                          { l: 'Total', v: bulkStatus.totalFiles, c: 'text-slate-900' },
-                          { l: 'Verified', v: bulkStatus.processedFiles, c: 'text-emerald-600' },
-                          { l: 'Halt', v: bulkStatus.failedFiles, c: 'text-rose-600' },
-                          { l: 'Buffer', v: bulkStatus.pendingFiles, c: 'text-indigo-600' }
-                        ].map((s, i) => (
-                          <div key={i} className="p-4 bg-slate-50/50 rounded-3xl border border-slate-100 text-center">
-                            <p className="text-[9px] text-slate-400 font-black uppercase mb-1 tracking-widest">{s.l}</p>
-                            <p className={cn("text-xl font-black font-mono", s.c)}>{s.v}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex justify-center gap-4">
-                        <Button variant="outline" className="rounded-2xl px-10" onClick={resetBulkUpload}>New Transmission</Button>
-                        {bulkStatus.status === 'PARTIAL' && <Button variant="secondary" className="rounded-2xl px-10" onClick={handleRetry}>Recover Failed</Button>}
-                      </div>
                     </div>
-                  )}
-                </div>
+
+                    <div className="grid grid-cols-4 gap-4">
+                      {[
+                        { label: 'Total', val: bulkStatus.totalFiles, c: 'text-slate-900', bg: 'bg-slate-50' },
+                        { label: 'Synced', val: bulkStatus.processedFiles, c: 'text-emerald-600', bg: 'bg-emerald-50' },
+                        { label: 'Halt', val: bulkStatus.failedFiles, c: 'text-rose-600', bg: 'bg-rose-50' },
+                        { label: 'Queue', val: bulkStatus.pendingFiles, c: 'text-indigo-600', bg: 'bg-indigo-50' }
+                      ].map((s, i) => (
+                        <div key={i} className={cn("p-4 rounded-3xl border border-slate-100 text-center", s.bg)}>
+                          <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">{s.label}</p>
+                          <p className={cn("text-xl font-black", s.c)}>{s.val}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Detailed File Status List with Error Handling */}
+                    <div className="max-h-60 overflow-y-auto border border-slate-100 rounded-[2rem] bg-slate-50/50 custom-scrollbar">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-100 sticky top-0 text-[9px] font-black uppercase text-slate-400 tracking-widest">
+                          <tr>
+                            <th className="text-left px-5 py-3">Block Name</th>
+                            <th className="text-left px-5 py-3">Status</th>
+                            <th className="text-left px-5 py-3">Audit Log</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bulkStatus.files.map((file, i) => (
+                            <tr key={i} className="border-b border-slate-100 bg-white group hover:bg-slate-50 transition-colors">
+                              <td className="px-5 py-4 font-bold text-slate-700 truncate max-w-[150px] text-xs">{file.fileName}</td>
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                  {getStatusIcon(file.status)}
+                                  <span className="text-[10px] font-black uppercase text-slate-400">{file.status}</span>
+                                </div>
+                              </td>
+                              <td className="px-5 py-4">
+                                {file.error ? (
+                                  <details className="cursor-pointer">
+                                    <summary className="text-rose-600 hover:text-rose-800 text-[10px] font-black uppercase tracking-widest">View Error</summary>
+                                    <div className="mt-2 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-[10px] text-rose-700 font-mono whitespace-pre-wrap max-w-xs shadow-xl">
+                                      {file.error}
+                                    </div>
+                                  </details>
+                                ) : file.status === 'COMPLETED' ? (
+                                  <span className="text-emerald-500 text-[10px] font-black uppercase">{file.recordsProcessed} Records OK</span>
+                                ) : (
+                                  <span className="text-slate-300">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {['COMPLETED', 'FAILED', 'PARTIAL'].includes(bulkStatus.status) && (
+                      <div className="flex justify-center gap-4 pt-6 border-t border-slate-100">
+                        <Button variant="primary" className="rounded-2xl px-10" onClick={resetBulkUpload}>Ingest More</Button>
+                        {bulkStatus.status === 'PARTIAL' && <Button variant="outline" className="rounded-2xl px-10" onClick={handleRetry}>Retry Fails</Button>}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Side: Schema Info & Recent Activity */}
+              {/* Side Info Panel */}
               <div className="lg:col-span-5 space-y-10">
-                <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl shadow-slate-200 relative overflow-hidden">
-                  <Activity className="h-12 w-12 text-white/5 absolute -top-4 -right-4" />
-                  <h4 className="text-sm font-black uppercase tracking-widest mb-6 text-indigo-400">Security Protocol</h4>
-                  <ul className="space-y-4">
+                <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl shadow-indigo-100 relative overflow-hidden">
+                  <Terminal className="h-12 w-12 text-white/10 absolute -top-4 -right-4" />
+                  <h4 className="text-sm font-black uppercase tracking-widest mb-8 text-indigo-400">Mainframe Protocol</h4>
+                  <ul className="space-y-6">
                     {[
-                      'Mandatory CSV encapsulation',
-                      'TLS 1.3 Data Tunneling',
-                      'Asynchronous In-Memory Logic',
-                      'High Resolution OHLCV Support'
-                    ].map((t, i) => (
-                      <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-300">
-                        <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                        {t}
+                      { t: 'CSV Validation', d: 'Strict OHLCV schema required', i: ShieldCheck },
+                      { t: 'Transmission', d: 'Secure TLS 1.3 encryption', i: Zap },
+                      { t: 'Async Logic', d: 'Calculation engine background sync', i: Activity }
+                    ].map((item, i) => (
+                      <li key={i} className="flex gap-4">
+                        <div className="mt-1"><item.i className="h-4 w-4 text-indigo-400" /></div>
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-widest">{item.t}</p>
+                          <p className="text-[10px] font-medium text-slate-400 mt-0.5">{item.d}</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-10 pt-8 border-t border-white/10">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Engine Uptime</p>
-                    <div className="flex items-center justify-between">
-                       <span className="text-2xl font-black italic tracking-tighter">99.9%</span>
-                       <div className="h-1 w-20 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                    </div>
+                  <div className="mt-12 pt-8 border-t border-white/10 flex items-center justify-between">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Engine Uptime</span>
+                     <span className="text-2xl font-black italic text-emerald-400">99.9%</span>
                   </div>
                 </div>
 
-                {/* Micro Activity Feed */}
+                {/* Audit Logs Quick Access */}
                 <div className="bg-white border border-slate-200 rounded-[3rem] p-10 shadow-sm">
-                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Archive Feed</h4>
-                   <div className="space-y-4 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
-                     {batchesLoading ? <Loading /> : batches.slice(0, 3).map((b: any) => (
-                       <div key={b.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl group transition-all hover:bg-white hover:border-indigo-100">
-                         <div className="overflow-hidden">
-                           <p className="text-xs font-black text-slate-900 truncate leading-none mb-1 uppercase tracking-tight">{b.name || 'Auto block'}</p>
-                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{b.totalFiles} packages</p>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            <span className={getStatusBadge(b.status)}>{b.status}</span>
-                            <ArrowRight className="h-3 w-3 text-slate-300 group-hover:translate-x-1 group-hover:text-indigo-500 transition-all" />
-                         </div>
-                       </div>
-                     ))}
-                   </div>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Recent Activity Logs</h4>
+                  <div className="space-y-4 max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
+                    {batches.slice(0, 3).map((b: any) => (
+                      <div key={b.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl group transition-all hover:bg-white hover:border-indigo-100">
+                        <div className="flex items-center justify-between">
+                           <div className="overflow-hidden">
+                             <p className="text-xs font-black text-slate-900 truncate leading-none mb-1 uppercase tracking-tight">{b.name || 'System Payload'}</p>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{b.totalFiles} Blocks Ingested</p>
+                           </div>
+                           <span className={getStatusBadge(b.status)}>{b.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2027,71 +2047,87 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'batches' && (
-            <div className="space-y-8 animate-in fade-in duration-500">
-              <div className="bg-white border border-slate-200 rounded-[3rem] p-12 shadow-sm">
+            <div className="space-y-10 animate-in fade-in duration-500">
+              <div className="bg-white border border-slate-200 rounded-[3.5rem] p-12 shadow-sm">
                 <div className="flex items-center justify-between mb-12">
-                   <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">System Logs</h2>
-                   <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['upload-batches'] })} className="rounded-xl">
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Sync
-                      </Button>
-                   </div>
+                   <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Archival Registry</h2>
+                   <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['upload-batches'] })} className="rounded-2xl">
+                     <RefreshCw className="h-4 w-4 mr-2" />
+                     Sync Registry
+                   </Button>
                 </div>
 
                 {batchesLoading ? <Loading /> : batches.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 gap-6">
                     {batches.map((batch: any) => (
-                      <div key={batch.id} className="group p-8 bg-slate-50/50 border border-slate-100 rounded-[2.5rem] hover:bg-white hover:border-indigo-100 transition-all duration-300">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                          <div className="flex items-center gap-6">
-                            <div className="h-16 w-16 rounded-[1.5rem] bg-white border border-slate-200 shadow-sm flex items-center justify-center text-indigo-600 group-hover:rotate-6 transition-all duration-500">
-                              <History className="h-7 w-7" />
+                      <div key={batch.id} className="group p-8 bg-slate-50/60 border border-slate-100 rounded-[3rem] hover:bg-white hover:border-indigo-200 transition-all duration-300">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+                          <div className="flex items-center gap-8">
+                            <div className="h-16 w-16 rounded-[2rem] bg-white border border-slate-200 shadow-sm flex items-center justify-center text-indigo-600 group-hover:rotate-6 transition-all duration-500">
+                              <Database className="h-8 w-8" />
                             </div>
                             <div>
-                              <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter">{batch.name || 'System Auto Batch'}</h4>
+                              <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter">{batch.name || 'Registry Payload'}</h4>
                               <div className="flex items-center gap-4 mt-2">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{batch.totalFiles} Blocks</span>
                                 <div className="h-1 w-1 bg-slate-300 rounded-full" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{batch.totalRecordsProcessed?.toLocaleString()} Entries</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{batch.totalRecordsProcessed?.toLocaleString()} Records</span>
                                 <div className="h-1 w-1 bg-slate-300 rounded-full" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(batch.createdAt).toLocaleDateString()}</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formatDate(batch.createdAt)}</span>
                               </div>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-8">
                             <span className={getStatusBadge(batch.status)}>{batch.status}</span>
-                            <div className="flex gap-3">
+                            <div className="flex gap-4">
                                 {batch.status === 'PENDING' && (
-                                  <button onClick={() => processMutation.mutate(batch.id)} className="p-2.5 hover:bg-emerald-50 text-emerald-600 rounded-xl transition-all border border-transparent hover:border-emerald-100">
-                                    <Play className="h-5 w-5" />
+                                  <button onClick={() => processMutation.mutate(batch.id)} className="p-3 hover:bg-emerald-50 text-emerald-600 rounded-2xl transition-all border border-transparent hover:border-emerald-100">
+                                    <Play className="h-5 w-5 fill-current" />
                                   </button>
                                 )}
-                                <button onClick={() => deleteMutation.mutate(batch.id)} className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl transition-all border border-transparent hover:border-rose-100">
+                                <button onClick={() => deleteMutation.mutate(batch.id)} className="p-3 hover:bg-rose-50 text-rose-500 rounded-2xl transition-all border border-transparent hover:border-rose-100">
                                   <Trash2 className="h-5 w-5" />
                                 </button>
                             </div>
                           </div>
                         </div>
+
+                        {/* Audit Logs for Historical Batches */}
+                        {batch.errorSummary && (
+                          <div className="mt-8 border-t border-slate-200 pt-6">
+                            <details className="group">
+                              <summary className="cursor-pointer text-rose-600 font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
+                                <AlertTriangle className="h-3 w-3" />
+                                View Sync Audit Logs ({batch.failedFiles} blocks failed)
+                              </summary>
+                              <div className="mt-4 p-8 bg-slate-900 rounded-[2.5rem] border border-slate-800">
+                                <pre className="whitespace-pre-wrap font-mono text-[11px] text-indigo-300 leading-relaxed custom-scrollbar max-h-60 overflow-auto">
+                                  {typeof batch.errorSummary === 'string' 
+                                    ? batch.errorSummary 
+                                    : JSON.stringify(batch.errorSummary, null, 2)}
+                                </pre>
+                              </div>
+                            </details>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="py-24 text-center">
-                    <History className="h-12 w-12 text-slate-200 mx-auto mb-4 opacity-30" />
-                    <p className="font-bold text-slate-400 uppercase tracking-widest text-sm">No activity logs recorded.</p>
+                  <div className="py-24 text-center space-y-4">
+                    <History className="h-16 w-16 text-slate-200 mx-auto opacity-30" />
+                    <p className="font-black text-slate-400 uppercase tracking-widest text-sm italic">No data registries found in archives.</p>
                   </div>
                 )}
               </div>
             </div>
           )}
-        </section>
       </main>
 
-      {/* Floating Unique Command Dock - Replaces standard sidebar */}
+      {/* Unique Floating Command Dock */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 duration-1000 delay-300">
-        <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 p-2.5 rounded-[2.5rem] shadow-2xl flex items-center gap-1">
+        <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 p-2.5 rounded-full shadow-2xl flex items-center gap-1">
           {navigation.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -2100,10 +2136,10 @@ export default function AdminPage() {
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={cn(
-                  "flex items-center gap-3 px-6 py-3 rounded-full transition-all duration-300 group relative",
+                  "flex items-center gap-3 px-6 py-3.5 rounded-full transition-all duration-300 group relative",
                   isActive 
                     ? "bg-white text-slate-900 shadow-xl" 
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-500 hover:text-white"
                 )}
               >
                 <Icon className={cn(
@@ -2117,9 +2153,9 @@ export default function AdminPage() {
                   {item.name}
                 </span>
                 {isActive && (
-                  <span className="absolute -top-1 right-2 flex h-2 w-2">
+                  <span className="absolute -top-1 right-3 flex h-1.5 w-1.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
                   </span>
                 )}
               </button>
@@ -2128,7 +2164,7 @@ export default function AdminPage() {
           <div className="w-[1px] h-6 bg-white/10 mx-2" />
           <button 
             onClick={() => router.push('/')}
-            className="p-3 text-slate-400 hover:text-white transition-colors"
+            className="p-3.5 text-slate-500 hover:text-white transition-colors"
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
