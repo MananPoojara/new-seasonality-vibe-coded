@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import Button from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loading } from '@/components/ui/loading';
 import { 
@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { MetricCard } from './MetricCard';
 import { DataViewerModal } from './DataViewerModal';
 
 interface LatestDataRecord {
@@ -22,6 +23,7 @@ interface LatestDataRecord {
 }
 
 const TIMEFRAME_INFO = {
+
   daily: {
     name: 'Daily Data',
     description: 'OHLCV data with calculated fields',
@@ -117,159 +119,184 @@ export function CalculatedDataSection() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Symbols</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {statsLoading ? <Loading size="sm" /> : statsData?.totalSymbols || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Daily Records</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {statsLoading ? <Loading size="sm" /> : statsData?.recordCounts?.daily?.toLocaleString() || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Weekly Records</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {statsLoading ? <Loading size="sm" /> : statsData?.recordCounts?.weekly?.toLocaleString() || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Records</CardTitle>
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {statsLoading ? <Loading size="sm" /> : statsData?.recordCounts?.total?.toLocaleString() || 0}
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-8">
+      {/* Enhanced Stats Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <MetricCard
+          title="Total Symbols"
+          value={statsData?.totalSymbols || 0}
+          icon={Database}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-50"
+          isLoading={statsLoading}
+          tooltip="Total number of symbols with calculated data"
+        />
+        <MetricCard
+          title="Daily Records"
+          value={statsData?.recordCounts?.daily || 0}
+          icon={Calendar}
+          iconColor="text-emerald-600"
+          iconBgColor="bg-emerald-50"
+          isLoading={statsLoading}
+          tooltip="Total daily seasonality records"
+        />
+        <MetricCard
+          title="Weekly Records"
+          value={statsData?.recordCounts?.weekly || 0}
+          icon={BarChart3}
+          iconColor="text-violet-600"
+          iconBgColor="bg-violet-50"
+          isLoading={statsLoading}
+          tooltip="Total weekly aggregated records"
+        />
+        <MetricCard
+          title="Total Records"
+          value={statsData?.recordCounts?.total || 0}
+          icon={ExternalLink}
+          iconColor="text-orange-600"
+          iconBgColor="bg-orange-50"
+          isLoading={statsLoading}
+          tooltip="Total calculated records across all timeframes"
+        />
       </div>
 
-      {/* Symbol Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle>View Calculated Data</CardTitle>
-          <CardDescription>
-            Search for a symbol to view its calculated seasonality data (Daily, Weekly, Monthly, Yearly)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex space-x-2">
-            <Input
-              placeholder="Enter symbol (e.g., RELIANCE, NIFTY)"
-              value={searchSymbol}
-              onChange={(e) => setSearchSymbol(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearchSymbol()}
-              className="flex-1"
-            />
-            <Button onClick={handleSearchSymbol} disabled={!searchSymbol.trim()}>
+      {/* Enhanced Symbol Search */}
+      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+              <Search className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Symbol Analysis</h3>
+              <p className="text-sm text-slate-600">Search and analyze calculated seasonality data</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-6">
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Enter symbol (e.g., RELIANCE, NIFTY, INFY)"
+                value={searchSymbol}
+                onChange={(e) => setSearchSymbol(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchSymbol()}
+                className="pl-10 border-slate-200 focus:border-blue-300 focus:ring-blue-200 h-11"
+              />
+            </div>
+            <Button 
+              onClick={handleSearchSymbol} 
+              disabled={!searchSymbol.trim()}
+              className="bg-slate-900 hover:bg-slate-800 text-white h-11 px-6"
+            >
               <Search className="h-4 w-4 mr-2" />
-              Search
+              Analyze
             </Button>
           </div>
-        </CardContent>
-      </Card>
+          
+          {/* Quick suggestions */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="text-xs text-slate-500 font-medium">Popular symbols:</span>
+            {['NIFTY', 'RELIANCE', 'TCS', 'INFY'].map((symbol) => (
+              <button
+                key={symbol}
+                onClick={() => {
+                  setSearchSymbol(symbol);
+                  setSelectedSymbol(symbol);
+                }}
+                className="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors"
+              >
+                {symbol}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-      {/* Symbol Data */}
+      {/* Symbol Data - Enhanced design */}
       {selectedSymbol && (
-        <Card>
-          <CardHeader>
+        <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm">
+          <div className="p-6 border-b border-slate-100">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Data for {selectedSymbol}</CardTitle>
-                <CardDescription>Available calculated data</CardDescription>
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">Data for {selectedSymbol}</h3>
+                <p className="text-sm text-slate-600">Available calculated data across all timeframes</p>
               </div>
               <Button
                 onClick={() => handleDeleteTicker(selectedSymbol)}
                 variant="destructive"
                 size="sm"
+                className="bg-red-600 hover:bg-red-700"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete Ticker
               </Button>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div className="p-6">
             {symbolLoading ? (
-              <div className="flex justify-center py-8">
+              <div className="flex justify-center py-12">
                 <Loading />
               </div>
             ) : symbolData ? (
-              <div className="space-y-6">
-                {/* Symbol Info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-8">
+                {/* Symbol Info - Enhanced layout */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-slate-50/50 rounded-xl border border-slate-100">
                   <div>
-                    <div className="text-sm text-muted-foreground">Total Records</div>
-                    <div className="text-lg font-semibold">{symbolData.totalRecords?.toLocaleString()}</div>
+                    <p className="text-sm font-medium text-slate-500 mb-1">Total Records</p>
+                    <p className="text-xl font-bold text-slate-900">{symbolData.totalRecords?.toLocaleString()}</p>
                   </div>
                   <div>
-                    <div className="text-sm text-muted-foreground">Date Range</div>
-                    <div className="text-lg font-semibold">
+                    <p className="text-sm font-medium text-slate-500 mb-1">Date Range</p>
+                    <p className="text-xl font-bold text-slate-900">
                       {symbolData.firstDataDate ? new Date(symbolData.firstDataDate).toLocaleDateString() : 'N/A'} - {symbolData.lastDataDate ? new Date(symbolData.lastDataDate).toLocaleDateString() : 'N/A'}
-                    </div>
+                    </p>
                   </div>
                   <div>
-                    <div className="text-sm text-muted-foreground">Last Updated</div>
-                    <div className="text-lg font-semibold">
+                    <p className="text-sm font-medium text-slate-500 mb-1">Last Updated</p>
+                    <p className="text-xl font-bold text-slate-900">
                       {symbolData.lastUpdated ? new Date(symbolData.lastUpdated).toLocaleDateString() : 'N/A'}
-                    </div>
+                    </p>
                   </div>
                 </div>
 
-                {/* Data Availability */}
-                <div className="space-y-3">
-                  {Object.entries(TIMEFRAME_INFO).map(([timeframe, info]) => {
-                    const count = symbolData.dataAvailable?.[timeframe as keyof typeof symbolData.dataAvailable] || 0;
-                    const Icon = info.icon;
-                    
-                    return (
-                      <div key={timeframe} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <Icon className={cn("h-5 w-5", info.color)} />
-                          <div>
-                            <div className="font-medium">{info.name}</div>
-                            <div className="text-sm text-muted-foreground">{info.description}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {count.toLocaleString()} records available
+                {/* Data Availability - Enhanced cards */}
+                <div>
+                  <h4 className="font-semibold text-slate-900 mb-4">Available Timeframes</h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    {Object.entries(TIMEFRAME_INFO).map(([timeframe, info]) => {
+                      const count = symbolData.dataAvailable?.[timeframe as keyof typeof symbolData.dataAvailable] || 0;
+                      const Icon = info.icon;
+                      
+                      return (
+                        <div key={timeframe} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50/50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center justify-center w-10 h-10 bg-slate-50 rounded-lg">
+                              <Icon className={cn("h-5 w-5", info.color)} />
+                            </div>
+                            <div>
+                              <p className="font-medium text-slate-900">{info.name}</p>
+                              <p className="text-sm text-slate-600">{info.description}</p>
+                              <p className="text-xs text-slate-500 font-medium">
+                                {count.toLocaleString()} records available
+                              </p>
                             </div>
                           </div>
+                          <Button
+                            onClick={() => handleViewData(selectedSymbol, timeframe)}
+                            variant="outline"
+                            size="sm"
+                            disabled={count === 0}
+                            className="border-slate-200 hover:bg-slate-50"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Data
+                          </Button>
                         </div>
-                        <Button
-                          onClick={() => handleViewData(selectedSymbol, timeframe)}
-                          variant="outline"
-                          size="sm"
-                          disabled={count === 0}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Data
-                        </Button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Latest Data Preview */}
@@ -322,42 +349,45 @@ export function CalculatedDataSection() {
                 No calculated data found for {selectedSymbol}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Recently Updated Symbols */}
       {statsData?.recentlyUpdated?.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recently Updated Symbols</CardTitle>
-            <CardDescription>Latest data processing activity</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
+          <div className="p-6 border-b border-slate-100">
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">Recently Updated Symbols</h3>
+            <p className="text-sm text-slate-600">Latest data processing activity</p>
+          </div>
+          <div className="p-6">
             <div className="space-y-3">
               {statsData.recentlyUpdated.map((symbol: any) => (
-                <div key={symbol.symbol} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Database className="h-4 w-4 text-blue-600" />
+                <div key={symbol.symbol} className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                      <Database className="h-5 w-5 text-blue-600" />
+                    </div>
                     <div>
-                      <div className="font-medium text-sm">{symbol.symbol}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <p className="font-semibold text-slate-900">{symbol.symbol}</p>
+                      <p className="text-sm text-slate-600">
                         {symbol.totalRecords?.toLocaleString()} records • Updated {new Date(symbol.lastUpdated).toLocaleDateString()}
-                      </div>
+                      </p>
                     </div>
                   </div>
                   <Button
                     onClick={() => setSelectedSymbol(symbol.symbol)}
                     variant="ghost"
                     size="sm"
+                    className="text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                   >
-                    <Eye className="h-3 w-3" />
+                    <Eye className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Data Viewer Modal */}

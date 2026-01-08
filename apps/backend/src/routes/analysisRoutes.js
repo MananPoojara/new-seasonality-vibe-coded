@@ -13,7 +13,7 @@ const router = express.Router();
 const prisma = require('../utils/prisma');
 const { logger } = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
-const { NotFoundError, ValidationError } = require('../utils/errors');
+const { NotFoundError } = require('../utils/errors');
 
 /**
  * GET /analysis/symbols
@@ -155,7 +155,7 @@ router.get('/symbols/:symbol/monday-weekly',
         success: true,
         data: {
           symbol: ticker.symbol,
-          timeframe: 'mondayWeekly',
+          timeframe: 'monday-weekly',
           records,
           pagination: {
             total,
@@ -205,7 +205,7 @@ router.get('/symbols/:symbol/expiry-weekly',
         success: true,
         data: {
           symbol: ticker.symbol,
-          timeframe: 'expiryWeekly',
+          timeframe: 'expiry-weekly',
           records,
           pagination: {
             total,
