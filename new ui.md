@@ -1,3 +1,5 @@
+```jsx
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -288,3 +290,4 @@ function formatCellValue(value: any, column: string): React.ReactNode {
   
   return <span className="text-slate-600">{String(value)}</span>;
 }
+```
