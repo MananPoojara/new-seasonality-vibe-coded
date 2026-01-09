@@ -242,7 +242,7 @@ class CSVProcessor {
       } else {
         const parsedDate = parseDate(dateValue);
         if (!parsedDate) {
-          errors.push(`Row ${rowNum}: Invalid date format "${dateValue}" (expected: DD-MM-YYYY, DD/MM/YYYY, or YYYY-MM-DD)`);
+          errors.push(`Row ${rowNum}: Invalid date format "${dateValue}" (supports: DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY, DD.MM.YYYY, DD MMM YYYY, MMM DD YYYY, YYYYMMDD, and many other common formats)`);
         }
       }
 
@@ -272,7 +272,7 @@ class CSVProcessor {
   }
 
   /**
-   * Process data for a single symbol
+   * Process data for a single symbol with smart incremental updates
    * @param {string} symbol - Symbol name
    * @param {Array} data - Symbol data
    * @param {number} existingTickerId - Existing ticker ID (optional)
@@ -304,8 +304,67 @@ class CSVProcessor {
         });
       }
 
+      // SMART INCREMENTAL UPDATE LOGIC
+      let dataToProcess = dedupedData;
+      let isIncrementalUpdate = false;
+      let lastDbDate = null;
+
+      // Check if this ticker already has data
+      const existingDataInfo = await prisma.seasonalityData.findFirst({
+        where: { tickerId: ticker.id },
+        orderBy: { date: 'desc' },
+        select: { date: true }
+      });
+
+      if (existingDataInfo && options.incrementalUpdate !== false) {
+        lastDbDate = existingDataInfo.date;
+        logger.info('Found existing data for ticker', { 
+          symbol, 
+          lastDbDate: lastDbDate.toISOString().split('T')[0],
+          totalCsvRecords: dedupedData.length 
+        });
+
+        // Filter CSV data to only include records after the last DB date
+        const newRecords = dedupedData.filter(record => record.date > lastDbDate);
+        
+        if (newRecords.length > 0) {
+          dataToProcess = newRecords;
+          isIncrementalUpdate = true;
+          logger.info('Incremental update detected', {
+            symbol,
+            lastDbDate: lastDbDate.toISOString().split('T')[0],
+            newRecords: newRecords.length,
+            dateRange: newRecords.length > 0 ? {
+              from: newRecords[0].date.toISOString().split('T')[0],
+              to: newRecords[newRecords.length - 1].date.toISOString().split('T')[0]
+            } : null
+          });
+        } else {
+          logger.info('No new records found for incremental update', {
+            symbol,
+            lastDbDate: lastDbDate.toISOString().split('T')[0],
+            latestCsvDate: dedupedData.length > 0 ? dedupedData[dedupedData.length - 1].date.toISOString().split('T')[0] : 'none'
+          });
+          
+          // If no new records and not forcing full recalculation, skip processing
+          if (options.forceFullRecalculation !== true) {
+            return {
+              symbol,
+              tickerId: ticker.id,
+              recordCount: 0,
+              inserted: 0,
+              updated: 0,
+              skipped: dedupedData.length,
+              message: 'No new data to process'
+            };
+          }
+        }
+      } else {
+        logger.info('Full data processing - no existing data found', { symbol });
+      }
+
       // Convert to database format and store basic OHLCV data
-      const dbRecords = toDatabaseFormat(dedupedData, ticker.id);
+      const dbRecords = toDatabaseFormat(dataToProcess, ticker.id);
       const batches = batchData(dbRecords, this.options.batchSize);
       let inserted = 0;
       let updated = 0;
@@ -324,17 +383,103 @@ class CSVProcessor {
       logger.info('Checking generateCalculatedData option', { 
         symbol, 
         generateCalculatedData: options.generateCalculatedData,
-        optionsKeys: Object.keys(options),
-        dedupedDataLength: dedupedData.length
+        isIncrementalUpdate,
+        dataToProcessLength: dataToProcess.length
       });
       
       if (options.generateCalculatedData !== false) {
-        logger.info('Starting calculated data generation', { symbol, recordCount: dedupedData.length });
+        logger.info('Starting calculated data generation', { 
+          symbol, 
+          recordCount: dataToProcess.length,
+          isIncrementalUpdate 
+        });
+        
         try {
-          calculatedCounts = await this.generateAndStoreCalculatedData(ticker.id, symbol, dedupedData);
+          if (isIncrementalUpdate && options.smartRecalculation !== false) {
+            // For incremental updates, we need to recalculate from a safe point
+            // Get all data from 1 year before the last DB date to ensure proper calculations
+            const recalcFromDate = new Date(lastDbDate);
+            recalcFromDate.setFullYear(recalcFromDate.getFullYear() - 1);
+            
+            const allRecentData = await prisma.seasonalityData.findMany({
+              where: {
+                tickerId: ticker.id,
+                date: { gte: recalcFromDate }
+              },
+              orderBy: { date: 'asc' },
+              select: {
+                date: true,
+                open: true,
+                high: true,
+                low: true,
+                close: true,
+                volume: true,
+                openInterest: true
+              }
+            });
+
+            // Convert DB format back to processing format
+            const dataForCalculation = allRecentData.map(record => ({
+              date: record.date,
+              symbol: symbol,
+              open: record.open,
+              high: record.high,
+              low: record.low,
+              close: record.close,
+              volume: record.volume,
+              openInterest: record.openInterest
+            }));
+
+            logger.info('Smart incremental recalculation', {
+              symbol,
+              recalcFromDate: recalcFromDate.toISOString().split('T')[0],
+              recordsForCalculation: dataForCalculation.length
+            });
+
+            calculatedCounts = await this.generateAndStoreCalculatedData(ticker.id, symbol, dataForCalculation, {
+              isIncremental: true,
+              fromDate: recalcFromDate
+            });
+          } else {
+            // Full recalculation - get all data for this ticker
+            const allData = await prisma.seasonalityData.findMany({
+              where: { tickerId: ticker.id },
+              orderBy: { date: 'asc' },
+              select: {
+                date: true,
+                open: true,
+                high: true,
+                low: true,
+                close: true,
+                volume: true,
+                openInterest: true
+              }
+            });
+
+            const dataForCalculation = allData.map(record => ({
+              date: record.date,
+              symbol: symbol,
+              open: record.open,
+              high: record.high,
+              low: record.low,
+              close: record.close,
+              volume: record.volume,
+              openInterest: record.openInterest
+            }));
+
+            logger.info('Full recalculation', {
+              symbol,
+              totalRecords: dataForCalculation.length
+            });
+
+            calculatedCounts = await this.generateAndStoreCalculatedData(ticker.id, symbol, dataForCalculation, {
+              isIncremental: false
+            });
+          }
           
           logger.info('Generated calculated data', {
             symbol,
+            isIncrementalUpdate,
             daily: calculatedCounts.daily,
             mondayWeekly: calculatedCounts.mondayWeekly,
             expiryWeekly: calculatedCounts.expiryWeekly,
@@ -355,10 +500,16 @@ class CSVProcessor {
       return {
         symbol,
         tickerId: ticker.id,
-        recordCount: dedupedData.length,
+        recordCount: dataToProcess.length,
         inserted,
         updated,
-        calculatedData: calculatedCounts
+        calculatedData: calculatedCounts,
+        isIncrementalUpdate,
+        lastDbDate: lastDbDate ? lastDbDate.toISOString().split('T')[0] : null,
+        newDataRange: dataToProcess.length > 0 ? {
+          from: dataToProcess[0].date.toISOString().split('T')[0],
+          to: dataToProcess[dataToProcess.length - 1].date.toISOString().split('T')[0]
+        } : null
       };
 
     } catch (error) {
@@ -427,17 +578,21 @@ class CSVProcessor {
    * @param {number} tickerId - Ticker ID
    * @param {string} symbol - Symbol name
    * @param {Array} dailyData - Daily data
+   * @param {Object} options - Generation options
    * @returns {Object} Counts of stored records
    */
-  async generateAndStoreCalculatedData(tickerId, symbol, dailyData) {
+  async generateAndStoreCalculatedData(tickerId, symbol, dailyData, options = {}) {
     try {
       const { generateSymbolFiles } = require('./fileGenerator');
+      const { isIncremental = false, fromDate = null } = options;
       
       // Generate calculated data using the same logic as Python
       const calculatedData = await generateSymbolFiles(dailyData, symbol);
       
       logger.info('Generated calculated data for storage', {
         symbol,
+        isIncremental,
+        fromDate: fromDate ? fromDate.toISOString().split('T')[0] : null,
         daily: calculatedData.daily?.length || 0,
         mondayWeekly: calculatedData.mondayWeekly?.length || 0,
         expiryWeekly: calculatedData.expiryWeekly?.length || 0,
@@ -453,6 +608,38 @@ class CSVProcessor {
         monthly: 0,
         yearly: 0
       };
+
+      // For incremental updates, we might need to delete and recalculate affected periods
+      if (isIncremental && fromDate) {
+        logger.info('Cleaning up affected calculated data for incremental update', { 
+          symbol, 
+          fromDate: fromDate.toISOString().split('T')[0] 
+        });
+
+        // Delete calculated data from the recalculation point onwards
+        await Promise.all([
+          prisma.weeklySeasonalityData.deleteMany({
+            where: {
+              tickerId: tickerId,
+              date: { gte: fromDate }
+            }
+          }),
+          prisma.monthlySeasonalityData.deleteMany({
+            where: {
+              tickerId: tickerId,
+              date: { gte: fromDate }
+            }
+          }),
+          prisma.yearlySeasonalityData.deleteMany({
+            where: {
+              tickerId: tickerId,
+              date: { gte: fromDate }
+            }
+          })
+        ]);
+
+        logger.info('Cleaned up old calculated data for incremental update', { symbol });
+      }
 
       // Store Weekly Seasonality Data (Monday-based)
       if (calculatedData.mondayWeekly && calculatedData.mondayWeekly.length > 0) {
@@ -718,7 +905,7 @@ class CSVProcessor {
         }
       }
 
-      logger.info('Completed storing calculated data', { symbol, counts });
+      logger.info('Completed storing calculated data', { symbol, counts, isIncremental });
       return counts;
 
     } catch (error) {

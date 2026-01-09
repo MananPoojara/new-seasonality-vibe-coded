@@ -7,7 +7,7 @@ const { normalizeColumnName } = require('./validators');
 
 /**
  * Parse date string to Date object
- * Supports multiple date formats
+ * Supports multiple date formats and automatically detects format
  * @param {string} dateStr 
  * @returns {Date|null}
  */
@@ -18,37 +18,342 @@ function parseDate(dateStr) {
 
   const str = dateStr.trim();
 
-  // Handle DD-MM-YYYY format (e.g., 24-12-2024)
-  const ddmmyyyy = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (ddmmyyyy) {
-    const [, day, month, year] = ddmmyyyy;
-    const d = parseInt(day), m = parseInt(month), y = parseInt(year);
-    if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
-      return new Date(Date.UTC(y, m - 1, d));
+  // Try multiple date parsing strategies
+  const strategies = [
+    // Strategy 1: DD-MM-YYYY format (e.g., 24-12-2024, 1-1-2024)
+    () => {
+      const match = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+      if (match) {
+        const [, day, month, year] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 2: DD/MM/YYYY format (e.g., 24/12/2024, 1/1/2024)
+    () => {
+      const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (match) {
+        const [, day, month, year] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 3: YYYY-MM-DD format (ISO format)
+    () => {
+      const match = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (match) {
+        const [, year, month, day] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 4: MM/DD/YYYY format (US format)
+    () => {
+      const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (match) {
+        const [, month, day, year] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        // Only accept if day > 12 (clearly not DD/MM) or month <= 12
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          // Prefer DD/MM interpretation unless day > 12
+          if (d > 12 || m <= 12) {
+            return new Date(Date.UTC(y, m - 1, d));
+          }
+        }
+      }
+      return null;
+    },
+
+    // Strategy 5: DD.MM.YYYY format (European dot format)
+    () => {
+      const match = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (match) {
+        const [, day, month, year] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 6: YYYY/MM/DD format
+    () => {
+      const match = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+      if (match) {
+        const [, year, month, day] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 7: DD MMM YY format (e.g., 24 Dec 24, 1 Jan 26) - 2-digit year
+    () => {
+      const monthNames = {
+        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
+        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
+        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
+        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
+        'may': 5, 'May': 5,
+        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
+        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
+        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
+        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
+        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
+        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
+        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
+      };
+
+
+      const match = str.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{2})$/);
+      if (match) {
+        const [, day, monthStr, yearStr] = match;
+        const d = parseInt(day);
+        const m = monthNames[monthStr.toLowerCase()];
+        let y = parseInt(yearStr);
+        
+        // Convert 2-digit year to 4-digit year
+        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
+        if (y <= 30) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 8: DD-MMM-YY format (e.g., 24-Dec-24, 09-Jan-26) - 2-digit year
+    () => {
+      const monthNames = {
+        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
+        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
+        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
+        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
+        'may': 5, 'May': 5,
+        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
+        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
+        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
+        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
+        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
+        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
+        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
+      };
+
+
+      const match = str.match(/^(\d{1,2})-([a-zA-Z]+)-(\d{2})$/);
+      if (match) {
+        const [, day, monthStr, yearStr] = match;
+        const d = parseInt(day);
+        const m = monthNames[monthStr.toLowerCase()];
+        let y = parseInt(yearStr);
+        
+        // Convert 2-digit year to 4-digit year
+        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
+        if (y <= 30) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 9: DD/MM/YY format (e.g., 24/12/24, 1/1/26) - 2-digit year
+    () => {
+      const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+      if (match) {
+        const [, day, month, yearStr] = match;
+        const d = parseInt(day), m = parseInt(month);
+        let y = parseInt(yearStr);
+        
+        // Convert 2-digit year to 4-digit year
+        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
+        if (y <= 30) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 10: DD-MM-YY format (e.g., 24-12-24, 1-1-26) - 2-digit year
+    () => {
+      const match = str.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
+      if (match) {
+        const [, day, month, yearStr] = match;
+        const d = parseInt(day), m = parseInt(month);
+        let y = parseInt(yearStr);
+        
+        // Convert 2-digit year to 4-digit year
+        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
+        if (y <= 30) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 11: DD MMM YYYY format (e.g., 24 Dec 2024, 1 Jan 2024) - 4-digit year
+    () => {
+      const monthNames = {
+        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
+        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
+        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
+        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
+        'may': 5, 'May': 5,
+        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
+        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
+        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
+        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
+        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
+        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
+        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
+      };
+
+
+      const match = str.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
+      if (match) {
+        const [, day, monthStr, year] = match;
+        const d = parseInt(day), y = parseInt(year);
+        const m = monthNames[monthStr.toLowerCase()];
+        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 12: MMM DD, YYYY format (e.g., Dec 24, 2024)
+    () => {
+      const monthNames = {
+        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
+        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
+        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
+        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
+        'may': 5, 'May': 5,
+        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
+        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
+        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
+        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
+        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
+        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
+        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
+      };
+
+
+      const match = str.match(/^([a-zA-Z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+      if (match) {
+        const [, monthStr, day, year] = match;
+        const d = parseInt(day), y = parseInt(year);
+        const m = monthNames[monthStr.toLowerCase()];
+        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 13: YYYYMMDD format (compact format)
+    () => {
+      const match = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+      if (match) {
+        const [, year, month, day] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 14: DD-MMM-YYYY format (e.g., 24-Dec-2024) - 4-digit year
+    () => {
+      const monthNames = {
+        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
+        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
+        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
+        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
+        'may': 5, 'May': 5,
+        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
+        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
+        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
+        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
+        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
+        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
+        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
+      };
+
+      const match = str.match(/^(\d{1,2})-([a-zA-Z]+)-(\d{4})$/);
+      if (match) {
+        const [, day, monthStr, year] = match;
+        const d = parseInt(day), y = parseInt(year);
+        const m = monthNames[monthStr.toLowerCase()];
+        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 15: JavaScript Date.parse() as fallback (handles many formats)
+    () => {
+      try {
+        const parsed = new Date(str);
+        if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 1900 && parsed.getFullYear() <= 2100) {
+          // Convert to UTC to avoid timezone issues
+          return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+      return null;
+    }
+  ];
+
+  // Try each strategy until one succeeds
+  for (const strategy of strategies) {
+    const result = strategy();
+    if (result) {
+      return result;
     }
   }
 
-  // Handle DD/MM/YYYY format (e.g., 24/12/2024)
-  const ddmmyyyySlash = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (ddmmyyyySlash) {
-    const [, day, month, year] = ddmmyyyySlash;
-    const d = parseInt(day), m = parseInt(month), y = parseInt(year);
-    if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
-      return new Date(Date.UTC(y, m - 1, d));
-    }
-  }
-
-  // Handle YYYY-MM-DD format (ISO format)
-  const yyyymmdd = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (yyyymmdd) {
-    const [, year, month, day] = yyyymmdd;
-    const d = parseInt(day), m = parseInt(month), y = parseInt(year);
-    if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
-      return new Date(Date.UTC(y, m - 1, d));
-    }
-  }
-
-  // NO FALLBACK - strict date parsing only
+  // If all strategies fail, return null
   return null;
 }
 
@@ -318,6 +623,23 @@ function batchData(data, batchSize = 1000) {
   return batches;
 }
 
+/**
+ * Format Date object to dd-mm-yyyy string
+ * @param {Date} date 
+ * @returns {string}
+ */
+function formatDateToDDMMYYYY(date) {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    return '';
+  }
+  
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  
+  return `${day}-${month}-${year}`;
+}
+
 module.exports = {
   parseDate,
   parseNumber,
@@ -329,4 +651,5 @@ module.exports = {
   fillMissingDates,
   toDatabaseFormat,
   batchData,
+  formatDateToDDMMYYYY,
 };

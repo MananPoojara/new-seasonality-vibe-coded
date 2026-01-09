@@ -30,13 +30,35 @@ app.use(helmet({
 }));
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-  credentials: true,
-  maxAge: 86400, // 24 hours
-}));
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map(o => o.trim())
+  : [];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow server-to-server, Postman, curl
+      if (!origin) return callback(null, true);
+
+      // DEV: allow everything (LAN, localhost, any IP)
+      if (process.env.NODE_ENV === "development") {
+        return callback(null, true);
+      }
+
+      // PROD: strict whitelist
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked: ${origin}`));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+    credentials: true,
+    maxAge: 86400,
+  })
+);
+
 
 // Compression
 app.use(compression());

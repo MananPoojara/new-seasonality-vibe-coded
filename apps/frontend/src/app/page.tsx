@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { LoadingPage } from '@/components/ui/loading';
-import { Button } from '@/components/ui/button';
+import {Button}  from '@/components/ui/button';
 import { BarChart3, TrendingUp, Calendar, Search } from 'lucide-react';
 import Link from 'next/link';
 
