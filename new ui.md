@@ -796,19 +796,24 @@ export default function AdminPage() {
                                         <td className="px-4 py-2.5 text-slate-600">{file.recordsProcessed || '-'}</td>
                                         <td className="px-4 py-2.5">
                                           {file.error ? (
-                                            <details className="group relative inline-block">
-                                              <summary className="list-none cursor-pointer text-rose-600 hover:text-rose-800 font-medium flex items-center gap-1">
-                                                <AlertCircle className="h-3 w-3" />
-                                                Error
-                                              </summary>
-                                              <div className="absolute right-0 top-6 z-50 w-64 p-3 bg-white border border-rose-100 rounded-lg shadow-xl text-rose-700 text-[10px] whitespace-pre-wrap leading-relaxed animate-in fade-in zoom-in-95 hidden group-open:block">
-                                                {file.error}
-                                              </div>
-                                            </details>
+                                            <div className="max-w-[250px]">
+                                              <details className="group cursor-pointer open:mb-2">
+                                                <summary className="text-rose-600 hover:text-rose-800 text-xs font-medium flex items-center gap-1.5 transition-colors focus:outline-none">
+                                                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                                  <span>View Error</span>
+                                                </summary>
+                                                <div className="mt-2 p-2.5 bg-rose-50 border border-rose-100 rounded-md text-xs text-rose-800 whitespace-pre-wrap font-mono leading-relaxed shadow-sm animate-in slide-in-from-top-1">
+                                                  {file.error}
+                                                </div>
+                                              </details>
+                                            </div>
                                           ) : file.status === 'COMPLETED' ? (
-                                            <span className="text-emerald-600 font-medium">Processed</span>
+                                            <span className="inline-flex items-center gap-1.5 text-emerald-600 text-xs font-medium">
+                                              <CheckCircle className="h-3.5 w-3.5" />
+                                              Success
+                                            </span>
                                           ) : (
-                                            <span className="text-slate-300">-</span>
+                                            <span className="text-slate-300 text-xs">-</span>
                                           )}
                                         </td>
                                       </tr>
