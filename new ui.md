@@ -80,7 +80,7 @@ import { Loading } from '@/components/ui/loading';
 import { 
   Upload, FileText, RefreshCw, Play, CheckCircle, XCircle, 
   Clock, Cloud, Trash2, RotateCcw, Database, FileSpreadsheet, LogOut, Settings,
-  AlertCircle, ArrowUpRight
+  AlertCircle, ArrowUpRight, ChevronDown, Activity, Layers, Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -581,27 +581,43 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               {/* Main Upload Area */}
               <div className="xl:col-span-2 space-y-6">
-                <Card className="border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-md bg-blue-100 p-1.5">
-                         <Cloud className="h-4 w-4 text-blue-600" />
+                <Card className="border-0 shadow-xl shadow-slate-200/40 ring-1 ring-slate-200 rounded-2xl overflow-hidden bg-white">
+                  <CardHeader className="border-b border-slate-50 bg-white px-8 py-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                         <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                            <Cloud className="h-5 w-5" />
+                         </div>
+                         <div>
+                            <CardTitle className="text-lg font-bold text-slate-900">Batch Upload</CardTitle>
+                            <CardDescription>Drag and drop your CSV files to process</CardDescription>
+                         </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-base font-semibold">Bulk CSV Upload</CardTitle>
-                        <CardDescription className="text-xs">Upload multiple data files at once (max 500)</CardDescription>
-                      </div>
+                      {bulkStatus && (
+                         <div className="flex items-center gap-2">
+                             <span className={cn(
+                               "relative flex h-3 w-3",
+                               bulkStatus.status === 'PROCESSING' ? "block" : "hidden"
+                             )}>
+                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                               <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                             </span>
+                             <span className={cn(
+                               "text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider",
+                               getStatusBadge(bulkStatus.status)
+                             )}>
+                               {bulkStatus.status}
+                             </span>
+                         </div>
+                      )}
                     </div>
                   </CardHeader>
                   
-                  <CardContent className="p-6">
+                  <CardContent className="p-0">
                     <div
                       className={cn(
-                        "relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 transition-all duration-300",
-                        dragActive 
-                          ? "border-blue-500 bg-blue-50/50" 
-                          : "border-slate-200 bg-slate-50/50 hover:border-blue-400 hover:bg-blue-50/30",
-                        error ? "border-rose-300 bg-rose-50/50" : ""
+                        "relative flex flex-col transition-all duration-300 min-h-[420px]",
+                        dragActive ? "bg-indigo-50/30" : "bg-white"
                       )}
                       onDragEnter={handleDrag}
                       onDragLeave={handleDrag}
@@ -613,294 +629,310 @@ export default function AdminPage() {
                         multiple
                         accept=".csv"
                         onChange={handleBulkFilesSelect as any}
-                        className="absolute inset-0 cursor-pointer opacity-0"
+                        className="absolute inset-0 cursor-pointer opacity-0 z-10"
                         id="bulk-file-upload"
                         disabled={isUploading || isProcessing}
                       />
 
                       {!bulkStatus ? (
-                        <div className="text-center space-y-4">
-                          <div className={cn(
-                            "mx-auto flex h-16 w-16 items-center justify-center rounded-full transition-colors",
-                            dragActive ? "bg-blue-100" : "bg-white shadow-sm border border-slate-100"
-                          )}>
-                            <Upload className={cn(
-                              "h-8 w-8",
-                              dragActive ? "text-blue-600" : "text-slate-400"
-                            )} />
-                          </div>
-
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-slate-900">
-                              <span className="text-blue-600 hover:underline">Click to upload</span> or drag and drop
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              CSV files only (max 500 files)
-                            </p>
-                          </div>
-
-                          {bulkFiles.length > 0 && (
-                            <div className="w-full max-w-md mx-auto mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-                              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2 bg-slate-50/50">
-                                <span className="text-xs font-semibold text-slate-700">
-                                  {bulkFiles.length} files selected
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.preventDefault(); // Prevent triggering file input
-                                    setBulkFiles([]);
-                                  }}
-                                  className="z-10 text-xs font-medium text-rose-600 hover:text-rose-700 hover:underline"
-                                >
-                                  Clear all
-                                </button>
+                         <div className="flex flex-col items-center justify-center flex-1 p-8">
+                           {bulkFiles.length === 0 ? (
+                              <div className="text-center space-y-6 max-w-sm mx-auto py-12">
+                                <div className={cn(
+                                  "mx-auto h-24 w-24 rounded-full flex items-center justify-center transition-all duration-300",
+                                  dragActive ? "bg-indigo-100 scale-110" : "bg-slate-50 border-2 border-dashed border-slate-200"
+                                )}>
+                                   <Upload className={cn(
+                                     "h-10 w-10 transition-colors",
+                                     dragActive ? "text-indigo-600" : "text-slate-400"
+                                   )} />
+                                </div>
+                                <div className="space-y-2">
+                                   <h3 className="text-xl font-bold text-slate-900">
+                                     Drop CSV files here
+                                   </h3>
+                                   <p className="text-slate-500">
+                                      Or click to browse from your computer. <br/>
+                                      <span className="text-xs text-slate-400">Max 500 files per batch.</span>
+                                   </p>
+                                </div>
+                                <div className="pt-2">
+                                   <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-8 h-12 shadow-lg shadow-indigo-200">
+                                      Select Files
+                                   </Button>
+                                </div>
                               </div>
-                              <ul className="max-h-40 overflow-y-auto px-2 py-1">
-                                {bulkFiles.slice(0, 10).map((file, i) => (
-                                  <li key={i} className="flex items-center justify-between py-2 px-2 text-xs hover:bg-slate-50 rounded">
-                                    <div className="flex items-center gap-2 truncate">
-                                      <FileText className="h-3 w-3 text-slate-400" />
-                                      <span className="truncate max-w-[200px] text-slate-600 font-medium">{file.name}</span>
-                                    </div>
-                                    <span className="text-slate-400">{formatFileSize(file.size)}</span>
-                                  </li>
-                                ))}
-                                {bulkFiles.length > 10 && (
-                                  <li className="py-2 text-center text-xs text-slate-400 italic bg-slate-50 rounded mt-1">
-                                    + {bulkFiles.length - 10} more files
-                                  </li>
-                                )}
-                              </ul>
-                            </div>
-                          )}
-
-                          <div className="flex justify-center gap-3 pt-4 z-20 relative">
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation(); // Stop drag area click
-                                handleBulkUpload();
-                              }}
-                              disabled={isUploading || bulkFiles.length === 0}
-                              className="bg-blue-600 hover:bg-blue-700 text-white min-w-[140px]"
-                            >
-                              {isUploading ? (
-                                <>
-                                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                                  Uploading...
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="h-4 w-4 mr-2" />
-                                  Upload & Process
-                                </>
-                              )}
-                            </Button>
-
-                            {bulkFiles.length > 0 && !isUploading && (
-                              <Button 
-                                variant="outline" 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  resetBulkUpload();
-                                }}
-                                className="border-slate-200 text-slate-600"
-                              >
-                                Cancel
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        /* Processing Status Display */
-                        <div className="w-full space-y-6 text-left z-20 relative bg-white rounded-lg p-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-base font-semibold text-slate-900">Processing Batch</h3>
-                              <p className="text-xs text-slate-500">Batch ID: <span className="font-mono text-slate-400">{bulkStatus.batchId.substring(0,8)}...</span></p>
-                            </div>
-                            <span className={cn(
-                              "px-3 py-1 rounded-full text-xs font-semibold border",
-                              getStatusBadge(bulkStatus.status)
-                            )}>
-                              {bulkStatus.status}
-                            </span>
-                          </div>
-
-                          {/* Progress Bar */}
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs font-medium text-slate-600">
-                              <span>Overall Progress</span>
-                              <span>{bulkStatus.progress.toFixed(1)}%</span>
-                            </div>
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className={cn(
-                                  "h-full rounded-full transition-all duration-500 ease-out",
-                                  bulkStatus.status === 'FAILED' ? 'bg-rose-500' :
-                                  bulkStatus.status === 'COMPLETED' ? 'bg-emerald-500' :
-                                  'bg-blue-600'
-                                )}
-                                style={{ width: `${bulkStatus.progress}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Stats Grid */}
-                          <div className="grid grid-cols-4 gap-4">
-                            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
-                              <div className="text-lg font-bold text-slate-700">{bulkStatus.totalFiles}</div>
-                              <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total</div>
-                            </div>
-                            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-center">
-                              <div className="text-lg font-bold text-emerald-600">{bulkStatus.processedFiles}</div>
-                              <div className="text-[10px] uppercase font-bold text-emerald-600/70 tracking-wider">Success</div>
-                            </div>
-                            <div className="rounded-lg border border-rose-100 bg-rose-50/50 p-3 text-center">
-                              <div className="text-lg font-bold text-rose-600">{bulkStatus.failedFiles}</div>
-                              <div className="text-[10px] uppercase font-bold text-rose-600/70 tracking-wider">Failed</div>
-                            </div>
-                            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-center">
-                              <div className="text-lg font-bold text-blue-600">{bulkStatus.pendingFiles}</div>
-                              <div className="text-[10px] uppercase font-bold text-blue-600/70 tracking-wider">Pending</div>
-                            </div>
-                          </div>
-
-                          {/* File List */}
-                          {bulkStatus.files && bulkStatus.files.length > 0 && (
-                            <div className="rounded-lg border border-slate-200 overflow-hidden">
-                              <div className="max-h-60 overflow-y-auto">
-                                <table className="w-full text-xs">
-                                  <thead className="bg-slate-50 sticky top-0 z-10">
-                                    <tr>
-                                      <th className="text-left px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider">File Name</th>
-                                      <th className="text-left px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                                      <th className="text-left px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider">Records</th>
-                                      <th className="text-left px-4 py-3 font-semibold text-slate-500 uppercase tracking-wider">Info</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100 bg-white">
-                                    {bulkStatus.files.map((file, i) => (
-                                      <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                                        <td className="px-4 py-2.5 font-medium text-slate-700 truncate max-w-[150px]" title={file.fileName}>
-                                          {file.fileName}
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                          <span className={cn(
-                                            "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border",
-                                            getStatusBadge(file.status)
-                                          )}>
-                                            {getStatusIcon(file.status)}
-                                            {file.status}
-                                          </span>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-slate-600">{file.recordsProcessed || '-'}</td>
-                                        <td className="px-4 py-2.5">
-                                          {file.error ? (
-                                            <div className="max-w-[250px]">
-                                              <details className="group cursor-pointer open:mb-2">
-                                                <summary className="text-rose-600 hover:text-rose-800 text-xs font-medium flex items-center gap-1.5 transition-colors focus:outline-none">
-                                                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                                                  <span>View Error</span>
-                                                </summary>
-                                                <div className="mt-2 p-2.5 bg-rose-50 border border-rose-100 rounded-md text-xs text-rose-800 whitespace-pre-wrap font-mono leading-relaxed shadow-sm animate-in slide-in-from-top-1">
-                                                  {file.error}
+                           ) : (
+                              <div className="w-full h-full flex flex-col items-center max-w-2xl mx-auto space-y-6 py-6 z-20 relative">
+                                 <div className="w-full flex items-center justify-between">
+                                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                      <Layers className="h-5 w-5 text-indigo-600" />
+                                      Selected Files ({bulkFiles.length})
+                                    </h3>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      onClick={(e) => { e.stopPropagation(); setBulkFiles([]); }}
+                                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                    >
+                                      Clear All
+                                    </Button>
+                                 </div>
+                                 
+                                 <div className="w-full flex-1 bg-slate-50/80 rounded-xl border border-slate-200 overflow-hidden shadow-inner max-h-[250px] overflow-y-auto">
+                                    <div className="divide-y divide-slate-100">
+                                       {bulkFiles.map((file, i) => (
+                                          <div key={i} className="flex items-center justify-between p-3 hover:bg-white transition-colors">
+                                             <div className="flex items-center gap-3 overflow-hidden">
+                                                <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                                                   <FileSpreadsheet className="h-4 w-4" />
                                                 </div>
-                                              </details>
-                                            </div>
-                                          ) : file.status === 'COMPLETED' ? (
-                                            <span className="inline-flex items-center gap-1.5 text-emerald-600 text-xs font-medium">
-                                              <CheckCircle className="h-3.5 w-3.5" />
-                                              Success
-                                            </span>
-                                          ) : (
-                                            <span className="text-slate-300 text-xs">-</span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
+                                                <div className="min-w-0">
+                                                   <p className="text-sm font-medium text-slate-700 truncate">{file.name}</p>
+                                                   <p className="text-[10px] text-slate-400">{formatFileSize(file.size)}</p>
+                                                </div>
+                                             </div>
+                                             <div className="h-2 w-2 rounded-full bg-indigo-400"></div>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
 
-                          {/* Actions */}
-                          {['COMPLETED', 'FAILED', 'PARTIAL'].includes(bulkStatus.status) && (
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                               <p className="text-xs text-slate-400 italic">Processing finished.</p>
-                               <div className="flex gap-3">
-                                <Button size="sm" onClick={resetBulkUpload} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-blue-600">
-                                  <Upload className="h-3.5 w-3.5 mr-2" />
-                                  New Upload
-                                </Button>
-
-                                {bulkStatus.status === 'PARTIAL' && (
-                                  <Button size="sm" variant="outline" onClick={handleRetry} className="border-amber-200 text-amber-700 hover:bg-amber-50">
-                                    <RotateCcw className="h-3.5 w-3.5 mr-2" />
-                                    Retry Failed
-                                  </Button>
-                                )}
+                                 <div className="w-full flex justify-center gap-4 pt-4">
+                                    <Button 
+                                      onClick={(e) => { e.stopPropagation(); handleBulkUpload(); }}
+                                      disabled={isUploading}
+                                      className="w-full sm:w-auto min-w-[200px] h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200/50"
+                                    >
+                                       {isUploading ? (
+                                          <>
+                                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                            Uploading & Processing...
+                                          </>
+                                       ) : (
+                                          <>
+                                            <Cloud className="h-4 w-4 mr-2" />
+                                            Start Upload Process
+                                          </>
+                                       )}
+                                    </Button>
+                                 </div>
                               </div>
-                            </div>
-                          )}
+                           )}
+                         </div>
+                      ) : (
+                        /* Processing View */
+                        <div className="flex flex-col h-full z-20 relative bg-white">
+                           {/* Progress Header */}
+                           <div className="bg-slate-50/50 px-8 py-8 border-b border-slate-100">
+                              <div className="flex items-end justify-between mb-4">
+                                 <div>
+                                    <h4 className="text-slate-500 font-medium text-sm mb-1">Processing Progress</h4>
+                                    <div className="flex items-baseline gap-2">
+                                       <span className="text-4xl font-black text-slate-900 tracking-tight">{bulkStatus.progress.toFixed(0)}%</span>
+                                       <span className="text-sm font-medium text-slate-400">completed</span>
+                                    </div>
+                                 </div>
+                                 <div className="flex gap-2">
+                                    {['COMPLETED', 'FAILED', 'PARTIAL'].includes(bulkStatus.status) && (
+                                       <Button size="sm" onClick={resetBulkUpload} variant="outline" className="h-9">
+                                          Upload More
+                                       </Button>
+                                    )}
+                                    {bulkStatus.status === 'PARTIAL' && (
+                                       <Button size="sm" onClick={handleRetry} className="h-9 bg-amber-500 hover:bg-amber-600 text-white">
+                                          <RotateCcw className="h-3.5 w-3.5 mr-2" /> Retry Failed
+                                       </Button>
+                                    )}
+                                 </div>
+                              </div>
+                              <div className="h-4 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                                 <div 
+                                    className={cn(
+                                       "h-full rounded-full transition-all duration-700 ease-out shadow-lg relative overflow-hidden",
+                                       bulkStatus.status === 'FAILED' ? 'bg-rose-500' :
+                                       bulkStatus.status === 'COMPLETED' ? 'bg-emerald-500' :
+                                       'bg-indigo-600'
+                                    )}
+                                    style={{ width: `${bulkStatus.progress}%` }} 
+                                 >
+                                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent)', backgroundSize: '1rem 1rem' }}></div>
+                                 </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-4 gap-4 mt-8">
+                                 <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm flex flex-col items-center">
+                                    <span className="text-2xl font-bold text-slate-800">{bulkStatus.totalFiles}</span>
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mt-1">Total Files</span>
+                                 </div>
+                                 <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-3 shadow-sm flex flex-col items-center">
+                                    <span className="text-2xl font-bold text-emerald-600">{bulkStatus.processedFiles}</span>
+                                    <span className="text-[10px] uppercase font-bold text-emerald-600/70 tracking-wider mt-1">Success</span>
+                                 </div>
+                                 <div className="bg-rose-50 rounded-xl border border-rose-100 p-3 shadow-sm flex flex-col items-center">
+                                    <span className="text-2xl font-bold text-rose-600">{bulkStatus.failedFiles}</span>
+                                    <span className="text-[10px] uppercase font-bold text-rose-600/70 tracking-wider mt-1">Failed</span>
+                                 </div>
+                                 <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-3 shadow-sm flex flex-col items-center">
+                                    <span className="text-2xl font-bold text-indigo-600">{bulkStatus.pendingFiles}</span>
+                                    <span className="text-[10px] uppercase font-bold text-indigo-600/70 tracking-wider mt-1">Pending</span>
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* File List Table */}
+                           <div className="flex-1 overflow-hidden flex flex-col bg-white">
+                              <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
+                                 <Activity className="h-4 w-4 text-slate-400" />
+                                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">File Processing Log</span>
+                              </div>
+                              <div className="overflow-y-auto flex-1 p-0">
+                                 <table className="w-full text-left">
+                                    <tbody className="divide-y divide-slate-50">
+                                       {bulkStatus.files.map((file, i) => (
+                                          <tr key={i} className={cn(
+                                             "transition-colors group",
+                                             file.status === 'FAILED' ? "bg-rose-50/20 hover:bg-rose-50/40" : "hover:bg-slate-50"
+                                          )}>
+                                             <td className="px-6 py-4 w-[40%]">
+                                                <div className="flex items-center gap-3">
+                                                   <div className={cn(
+                                                      "p-2 rounded-lg shrink-0",
+                                                      file.status === 'FAILED' ? "bg-rose-100 text-rose-600" :
+                                                      file.status === 'COMPLETED' ? "bg-emerald-100 text-emerald-600" :
+                                                      "bg-slate-100 text-slate-400"
+                                                   )}>
+                                                      <FileText className="h-4 w-4" />
+                                                   </div>
+                                                   <div className="min-w-0">
+                                                      <p className="text-sm font-medium text-slate-700 truncate" title={file.fileName}>{file.fileName}</p>
+                                                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                         {file.recordsProcessed ? `${file.recordsProcessed} records` : 'Processing...'}
+                                                      </p>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                             <td className="px-6 py-4 w-[25%]">
+                                                {file.status === 'COMPLETED' ? (
+                                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-100">
+                                                      <Check className="h-3 w-3" /> Processed
+                                                   </span>
+                                                ) : file.status === 'FAILED' ? (
+                                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-medium border border-rose-100">
+                                                      <XCircle className="h-3 w-3" /> Failed
+                                                   </span>
+                                                ) : (
+                                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100">
+                                                      <RefreshCw className="h-3 w-3 animate-spin" /> Working
+                                                   </span>
+                                                )}
+                                             </td>
+                                             <td className="px-6 py-4 w-[35%] text-right">
+                                                {file.error ? (
+                                                   <details className="group/details relative inline-block text-left">
+                                                      <summary className="list-none cursor-pointer inline-flex items-center gap-2 text-xs font-medium text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg transition-all shadow-sm">
+                                                         <AlertCircle className="h-3.5 w-3.5" />
+                                                         <span>View Error Log</span>
+                                                         <ChevronDown className="h-3 w-3 transition-transform group-open/details:rotate-180" />
+                                                      </summary>
+                                                      <div className="absolute right-0 top-full mt-2 w-96 z-50 origin-top-right rounded-xl bg-slate-900 p-4 shadow-2xl ring-1 ring-slate-900/10 animate-in fade-in zoom-in-95 slide-in-from-top-2">
+                                                         <div className="flex items-start gap-3">
+                                                            <div className="mt-0.5 p-1 bg-rose-500/20 rounded">
+                                                               <AlertCircle className="h-4 w-4 text-rose-400" />
+                                                            </div>
+                                                            <div className="space-y-1 w-full">
+                                                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">System Error</p>
+                                                               <div className="text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 whitespace-pre-wrap break-words leading-relaxed max-h-60 overflow-y-auto">
+                                                                  {file.error}
+                                                               </div>
+                                                            </div>
+                                                         </div>
+                                                      </div>
+                                                   </details>
+                                                ) : (
+                                                   <span className="text-slate-300 text-xs font-medium">-</span>
+                                                )}
+                                             </td>
+                                          </tr>
+                                       ))}
+                                    </tbody>
+                                 </table>
+                              </div>
+                           </div>
                         </div>
                       )}
                     </div>
-
-                    {error && (
-                      <div className="mt-4 flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-lg animate-in slide-in-from-top-2">
-                        <XCircle className="text-rose-600 h-5 w-5 flex-shrink-0" />
-                        <span className="text-rose-700 text-sm font-medium">{error}</span>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
+
+                {error && (
+                  <div className="mt-6 flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-xl shadow-sm animate-in slide-in-from-top-2">
+                    <div className="bg-rose-100 p-2 rounded-full">
+                      <XCircle className="text-rose-600 h-5 w-5" />
+                    </div>
+                    <span className="text-rose-700 text-sm font-medium">{error}</span>
+                  </div>
+                )}
               </div>
 
               {/* Sidebar: Batches & Requirements */}
               <div className="space-y-6">
-                <Card className="border-slate-200 shadow-sm h-[calc(100%-1rem)] flex flex-col">
-                  <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
-                    <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
+                <Card className="border-0 shadow-lg shadow-slate-200/40 ring-1 ring-slate-200 h-[calc(100%-1rem)] flex flex-col bg-white">
+                  <CardHeader className="bg-white border-b border-slate-50 py-5 px-6">
+                    <CardTitle className="text-base font-bold text-slate-800">Quick Actions</CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 flex-1 space-y-6">
+                  <CardContent className="p-6 flex-1 space-y-8">
                      <div className="space-y-4">
-                        <div className="rounded-lg bg-blue-50 p-4 border border-blue-100">
-                          <div className="flex items-center gap-2 text-blue-700 font-semibold mb-2 text-sm">
+                        <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 p-5 border border-indigo-100 shadow-sm">
+                          <div className="flex items-center gap-2 text-indigo-700 font-bold mb-3 text-sm">
                             <AlertCircle className="h-4 w-4" />
                             File Requirements
                           </div>
-                          <ul className="space-y-2 text-xs text-blue-900/70 list-disc list-inside">
-                            <li>Format: <strong>CSV (.csv)</strong> only</li>
-                            <li>Max files: <strong>500</strong> per batch</li>
-                            <li>Required: Date, Ticker, Close</li>
-                            <li>Formats: YYYY-MM-DD or DD-MM-YYYY</li>
+                          <ul className="space-y-3 text-xs text-indigo-900/80">
+                            <li className="flex items-center gap-2">
+                               <div className="h-1.5 w-1.5 rounded-full bg-indigo-400"></div>
+                               Format: <strong>CSV (.csv)</strong> only
+                            </li>
+                            <li className="flex items-center gap-2">
+                               <div className="h-1.5 w-1.5 rounded-full bg-indigo-400"></div>
+                               Max files: <strong>500</strong> per batch
+                            </li>
+                            <li className="flex items-center gap-2">
+                               <div className="h-1.5 w-1.5 rounded-full bg-indigo-400"></div>
+                               Required: Date, Ticker, Close
+                            </li>
+                            <li className="flex items-center gap-2">
+                               <div className="h-1.5 w-1.5 rounded-full bg-indigo-400"></div>
+                               Formats: YYYY-MM-DD or DD-MM-YYYY
+                            </li>
                           </ul>
                         </div>
                      </div>
 
                      <div>
-                       <h4 className="text-sm font-semibold text-slate-900 mb-3 flex items-center justify-between">
-                         Recent Batches
-                         <Button variant="link" size="sm" className="h-auto p-0 text-xs text-blue-600" onClick={() => setActiveTab('batches')}>View all</Button>
+                       <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center justify-between">
+                         Recent Uploads
+                         <Button variant="link" size="sm" className="h-auto p-0 text-xs text-indigo-600 font-medium" onClick={() => setActiveTab('batches')}>View all</Button>
                        </h4>
                        
                        {isLoading ? (
                           <div className="flex justify-center py-4"><Loading /></div>
                        ) : batches.length === 0 ? (
-                          <p className="text-center text-xs text-slate-400 py-4 italic">No recent uploads</p>
+                          <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                             <p className="text-xs text-slate-400 italic">No recent uploads found</p>
+                          </div>
                        ) : (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {batches.slice(0, 5).map((batch: any) => (
-                              <div key={batch.id} className="group flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all cursor-default">
+                              <div key={batch.id} className="group flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-100/50 transition-all cursor-default">
                                 <div className="min-w-0">
-                                  <p className="font-medium text-sm text-slate-700 truncate">{batch.name || 'Unnamed Batch'}</p>
-                                  <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                                  <p className="font-semibold text-sm text-slate-700 truncate group-hover:text-indigo-700 transition-colors">{batch.name || 'Unnamed Batch'}</p>
+                                  <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5">
                                     <Clock className="h-3 w-3" />
                                     {new Date(batch.createdAt).toLocaleDateString()}
                                   </p>
                                 </div>
-                                <div className={cn("h-2 w-2 rounded-full", 
+                                <div className={cn("h-2.5 w-2.5 rounded-full shadow-sm ring-2 ring-white", 
                                   batch.status === 'COMPLETED' ? "bg-emerald-500" :
                                   batch.status === 'FAILED' ? "bg-rose-500" : "bg-amber-500"
                                 )} title={batch.status} />
