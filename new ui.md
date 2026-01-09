@@ -1629,831 +1629,474 @@ export default function AdminPage() {
 
 
 ```jsx
-import React, { useState, useEffect, useRef } from "react";
-import { createRoot } from "react-dom/client";
+'use client';
 
-// --- ICONS (Lucide Style SVGs) ---
-const Icons = {
-  LayoutDashboard: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>
-  ),
-  Folder: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
-  ),
-  Users: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-  ),
-  Settings: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.39a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
-  ),
-  Upload: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></svg>
-  ),
-  Bell: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
-  ),
-  Search: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-  ),
-  MoreVertical: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" /></svg>
-  ),
-  X: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-  ),
-  Menu: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
-  ),
-  CheckCircle: (props: any) => (
-     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-  ),
-  FileText: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-  ),
-  Trash: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-  ),
-  AlertTriangle: (props: any) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-  )
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Loading } from '@/components/ui/loading';
+import { 
+  Database, Search, Calendar, 
+  BarChart3, TrendingUp, Archive, ExternalLink, Eye, Trash2,
+  Clock, ArrowRight, Activity, AlertTriangle
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import api from '@/lib/api';
+import toast from 'react-hot-toast';
+import { DataViewerModal } from './DataViewerModal';
+
+interface LatestDataRecord {
+  date: string;
+  close: number;
+  returnPercentage: number | null;
+}
+
+const TIMEFRAME_INFO = {
+  daily: {
+    name: 'Daily Data',
+    description: 'OHLCV data with calculated fields',
+    icon: Calendar,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-100'
+  },
+  mondayWeekly: {
+    name: 'Monday Weekly',
+    description: 'Monday-based weekly aggregations',
+    icon: BarChart3,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50',
+    borderColor: 'border-emerald-100'
+  },
+  expiryWeekly: {
+    name: 'Expiry Weekly',
+    description: 'Expiry-based weekly aggregations',
+    icon: BarChart3,
+    color: 'text-teal-600',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-100'
+  },
+  monthly: {
+    name: 'Monthly Data',
+    description: 'Monthly aggregation with returns',
+    icon: TrendingUp,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-100'
+  },
+  yearly: {
+    name: 'Yearly Data',
+    description: 'Yearly aggregation with returns',
+    icon: Archive,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-100'
+  }
 };
 
-// --- STYLES ---
-const STYLES = `
-:root {
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --secondary: #e2e8f0;
-  --bg-dark: #0f172a;
-  --bg-light: #f8fafc;
-  --surface: #ffffff;
-  --text-main: #1e293b;
-  --text-sub: #64748b;
-  --border: #e2e8f0;
-  --success-bg: #dcfce7;
-  --success-text: #166534;
-  --warning-bg: #fef9c3;
-  --warning-text: #854d0e;
-  --error-bg: #fee2e2;
-  --error-text: #991b1b;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --radius: 8px;
-}
+export function CalculatedDataSection() {
+  const [searchSymbol, setSearchSymbol] = useState('');
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerTab, setViewerTab] = useState('daily');
 
-body {
-  margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: var(--bg-light);
-  color: var(--text-main);
-  -webkit-font-smoothing: antialiased;
-}
+  // Fetch analysis stats
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ['analysis-stats'],
+    queryFn: async () => {
+      const response = await api.get('/analysis/stats');
+      return response.data.data;
+    },
+  });
 
-.app-container {
-  display: flex;
-  min-height: 100vh;
-}
+  // Fetch symbol data
+  const { data: symbolData, isLoading: symbolLoading } = useQuery({
+    queryKey: ['symbol-analysis', selectedSymbol],
+    queryFn: async () => {
+      if (!selectedSymbol) return null;
+      const response = await api.get(`/analysis/symbols/${selectedSymbol}/summary`);
+      return response.data.data;
+    },
+    enabled: !!selectedSymbol,
+  });
 
-/* Sidebar */
-.sidebar {
-  width: 260px;
-  background-color: var(--bg-dark);
-  color: #94a3b8;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  transition: transform 0.3s ease;
-  z-index: 50;
-}
-
-.sidebar-logo {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  color: white;
-  font-weight: 700;
-  font-size: 1.25rem;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.sidebar-nav {
-  padding: 24px 16px;
-  flex: 1;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all 0.2s;
-  color: #94a3b8;
-  font-size: 0.95rem;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.nav-item:hover, .nav-item.active {
-  background-color: rgba(255,255,255,0.1);
-  color: white;
-}
-
-/* Main Content */
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0; /* Prevent overflow issues */
-}
-
-/* Header */
-.header {
-  height: 64px;
-  background-color: var(--surface);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 32px;
-  position: sticky;
-  top: 0;
-  z-index: 40;
-}
-
-.header-search {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--bg-light);
-  padding: 8px 16px;
-  border-radius: 20px;
-  width: 300px;
-  color: var(--text-sub);
-}
-
-.header-search input {
-  border: none;
-  background: transparent;
-  outline: none;
-  width: 100%;
-  color: var(--text-main);
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-sub);
-  padding: 8px;
-  border-radius: 50%;
-  transition: background 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-btn:hover {
-  background-color: var(--bg-light);
-  color: var(--text-main);
-}
-
-.avatar {
-  width: 36px;
-  height: 36px;
-  background-color: var(--primary);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-/* Dashboard Content */
-.content-area {
-  padding: 32px;
-  overflow-y: auto;
-}
-
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 24px;
-  color: var(--text-main);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.stat-card {
-  background: var(--surface);
-  padding: 24px;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-}
-
-.stat-label {
-  color: var(--text-sub);
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-main);
-}
-
-.stat-trend {
-  font-size: 0.875rem;
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.trend-up { color: var(--success-text); }
-.trend-down { color: var(--error-text); }
-
-/* File Upload */
-.upload-section {
-  background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-  padding: 32px;
-  margin-bottom: 32px;
-}
-
-.drop-zone {
-  border: 2px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 40px;
-  text-align: center;
-  transition: all 0.2s;
-  cursor: pointer;
-  background: var(--bg-light);
-}
-
-.drop-zone:hover, .drop-zone.active {
-  border-color: var(--primary);
-  background: #eef2ff;
-}
-
-.drop-icon {
-  color: var(--primary);
-  margin-bottom: 16px;
-}
-
-.drop-text-main {
-  font-weight: 600;
-  color: var(--text-main);
-  margin-bottom: 4px;
-}
-
-.drop-text-sub {
-  color: var(--text-sub);
-  font-size: 0.875rem;
-}
-
-/* Progress Bar */
-.progress-container {
-  margin-top: 24px;
-}
-.progress-bar-bg {
-  height: 8px;
-  background: var(--secondary);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.progress-bar-fill {
-  height: 100%;
-  background: var(--primary);
-  transition: width 0.3s ease;
-}
-.progress-text {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  margin-top: 8px;
-  color: var(--text-sub);
-}
-
-/* Data Table */
-.table-card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.table-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.table-title {
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th {
-  text-align: left;
-  padding: 16px 24px;
-  background: var(--bg-light);
-  color: var(--text-sub);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  border-bottom: 1px solid var(--border);
-}
-
-.data-table td {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-main);
-  font-size: 0.9rem;
-}
-
-.data-table tr:last-child td {
-  border-bottom: none;
-}
-
-.data-table tr:hover {
-  background-color: var(--bg-light);
-}
-
-/* Status Badges */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.badge-success { background: var(--success-bg); color: var(--success-text); }
-.badge-warning { background: var(--warning-bg); color: var(--warning-text); }
-.badge-error { background: var(--error-bg); color: var(--error-text); }
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  font-size: 0.875rem;
-}
-
-.btn-primary {
-  background: var(--primary);
-  color: white;
-}
-.btn-primary:hover {
-  background: var(--primary-hover);
-}
-
-.btn-icon-only {
-  padding: 8px;
-  color: var(--text-sub);
-  background: transparent;
-}
-.btn-icon-only:hover {
-  color: var(--error-text);
-  background: var(--error-bg);
-}
-
-/* Toast */
-.toast-container {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.toast {
-  padding: 16px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-width: 300px;
-  animation: slideIn 0.3s ease;
-}
-
-.toast-error { border-left-color: var(--error-text); }
-.toast-success { border-left-color: var(--success-text); }
-
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-/* Responsive */
-.mobile-menu-btn {
-  display: none;
-  margin-right: 16px;
-}
-
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    height: 100%;
-    transform: translateX(-100%);
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  .mobile-menu-btn {
-    display: block;
-  }
-  .header {
-    padding: 0 16px;
-  }
-  .header-search {
-    display: none;
-  }
-  .content-area {
-    padding: 16px;
-  }
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-}
-`;
-
-// --- COMPONENTS ---
-
-const StatusBadge = ({ status }: { status: string }) => {
-  let type = "warning";
-  let label = status;
-  
-  switch(status.toLowerCase()) {
-    case 'completed':
-    case 'active':
-      type = 'success';
-      break;
-    case 'failed':
-    case 'error':
-      type = 'error';
-      break;
-    default:
-      type = 'warning';
-  }
-
-  return (
-    <span className={`badge badge-${type}`}>
-      {label}
-    </span>
-  );
-};
-
-const FileUploader = ({ onUpload }: { onUpload: (file: File) => void }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setIsDragging(true);
-    } else if (e.type === "dragleave") {
-      setIsDragging(false);
+  const handleSearchSymbol = async () => {
+    if (!searchSymbol.trim()) {
+      toast.error('Please enter a symbol');
+      return;
     }
+    setSelectedSymbol(searchSymbol.toUpperCase().trim());
   };
 
-  const processFile = (file: File) => {
-    setUploading(true);
-    // Simulate upload
-    let p = 0;
-    const interval = setInterval(() => {
-      p += 10;
-      setProgress(p);
-      if (p >= 100) {
-        clearInterval(interval);
+  const handleViewData = async (symbol: string, timeframe: string) => {
+    setSelectedSymbol(symbol);
+    setViewerTab(timeframe);
+    setViewerOpen(true);
+  };
+
+  const handleDeleteTicker = async (symbol: string) => {
+    if (!confirm(`Are you sure you want to delete ${symbol} and ALL its data from all tables? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/analysis/symbols/${symbol}`);
+      if (response.data.success) {
+        toast.success(`${symbol} deleted successfully. ${response.data.data.totalDeleted} records removed.`);
+        setSelectedSymbol(null);
+        // Use a more gentle refresh approach
         setTimeout(() => {
-          onUpload(file);
-          setUploading(false);
-          setProgress(0);
-        }, 500);
+          window.location.href = window.location.pathname;
+        }, 2000);
       }
-    }, 200);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error(err.response?.data?.error?.message || 'Failed to delete ticker');
     }
   };
 
   return (
-    <div className="upload-section">
-      <h3 className="table-title" style={{ marginBottom: '16px' }}>Upload New File</h3>
-      {!uploading ? (
-        <div 
-          className={`drop-zone ${isDragging ? 'active' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleChange} 
-            style={{ display: 'none' }} 
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Icons.Upload className="drop-icon" width={48} height={48} />
-            <div className="drop-text-main">Click to upload or drag and drop</div>
-            <div className="drop-text-sub">SVG, PNG, JPG or GIF (max. 800x400px)</div>
-          </div>
+    <div className="space-y-8 pb-12">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Total Symbols</p>
+                <h3 className="mt-2 text-3xl font-bold text-slate-900">
+                  {statsLoading ? <Loading size="sm" /> : statsData?.totalSymbols || 0}
+                </h3>
+              </div>
+              <div className="rounded-full bg-blue-50 p-3">
+                <Database className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Daily Records</p>
+                <h3 className="mt-2 text-3xl font-bold text-slate-900">
+                  {statsLoading ? <Loading size="sm" /> : statsData?.recordCounts?.daily?.toLocaleString() || 0}
+                </h3>
+              </div>
+              <div className="rounded-full bg-indigo-50 p-3">
+                <Calendar className="h-6 w-6 text-indigo-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Weekly Records</p>
+                <h3 className="mt-2 text-3xl font-bold text-slate-900">
+                  {statsLoading ? <Loading size="sm" /> : statsData?.recordCounts?.weekly?.toLocaleString() || 0}
+                </h3>
+              </div>
+              <div className="rounded-full bg-emerald-50 p-3">
+                <BarChart3 className="h-6 w-6 text-emerald-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Total Records</p>
+                <h3 className="mt-2 text-3xl font-bold text-slate-900">
+                  {statsLoading ? <Loading size="sm" /> : statsData?.recordCounts?.total?.toLocaleString() || 0}
+                </h3>
+              </div>
+              <div className="rounded-full bg-orange-50 p-3">
+                <ExternalLink className="h-6 w-6 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        {/* Main Content Area */}
+        <div className="xl:col-span-2 space-y-8">
+          
+          {/* Search Card */}
+          <Card className="border-0 shadow-lg shadow-slate-200/40 ring-1 ring-slate-200">
+            <CardHeader className="border-b border-slate-50 px-8 py-6">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <Search className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-bold text-slate-900">Data Explorer</CardTitle>
+                  <CardDescription>Search and analyze processed symbol data</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <Input
+                    placeholder="Enter symbol (e.g., RELIANCE, NIFTY)"
+                    value={searchSymbol}
+                    onChange={(e) => setSearchSymbol(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearchSymbol()}
+                    className="pl-10 h-12 text-lg"
+                  />
+                </div>
+                <Button 
+                  onClick={handleSearchSymbol} 
+                  disabled={!searchSymbol.trim()}
+                  className="h-12 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                >
+                  Search
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Symbol Data View */}
+          {selectedSymbol && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                   <div className="h-12 w-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xl shadow-lg">
+                      {selectedSymbol.substring(0, 2)}
+                   </div>
+                   <div>
+                      <h2 className="text-2xl font-bold text-slate-900">{selectedSymbol}</h2>
+                      <p className="text-sm text-slate-500 flex items-center gap-1">
+                         <Activity className="h-3 w-3" />
+                         Analysis Data
+                      </p>
+                   </div>
+                </div>
+                <Button
+                  onClick={() => handleDeleteTicker(selectedSymbol)}
+                  variant="ghost"
+                  className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Ticker
+                </Button>
+              </div>
+
+              {symbolLoading ? (
+                <div className="flex justify-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+                  <Loading />
+                </div>
+              ) : symbolData ? (
+                <div className="space-y-8">
+                  {/* Summary Stats Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Total Records</div>
+                      <div className="text-2xl font-bold text-slate-900">{symbolData.totalRecords?.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Date Range</div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        {symbolData.firstDataDate ? new Date(symbolData.firstDataDate).toLocaleDateString() : 'N/A'} 
+                        <span className="text-slate-400 mx-2">→</span> 
+                        {symbolData.lastDataDate ? new Date(symbolData.lastDataDate).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Last Updated</div>
+                      <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-emerald-500" />
+                        {symbolData.lastUpdated ? new Date(symbolData.lastUpdated).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Available Timeframes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(TIMEFRAME_INFO).map(([timeframe, info]) => {
+                      const count = symbolData.dataAvailable?.[timeframe as keyof typeof symbolData.dataAvailable] || 0;
+                      const Icon = info.icon;
+                      
+                      return (
+                        <Card key={timeframe} className={cn(
+                          "border transition-all hover:shadow-md",
+                          info.borderColor,
+                          count > 0 ? "bg-white" : "bg-slate-50 opacity-80"
+                        )}>
+                          <CardContent className="p-5">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className={cn("p-2.5 rounded-lg", info.bgColor)}>
+                                <Icon className={cn("h-5 w-5", info.color)} />
+                              </div>
+                              {count > 0 && (
+                                <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium bg-white border shadow-sm", info.color)}>
+                                  Available
+                                </span>
+                              )}
+                            </div>
+                            
+                            <h3 className="font-bold text-slate-900">{info.name}</h3>
+                            <p className="text-xs text-slate-500 mb-4 h-5">{info.description}</p>
+                            
+                            <div className="flex items-center justify-between mt-auto">
+                               <div className="text-xs font-semibold text-slate-600">
+                                 {count.toLocaleString()} records
+                               </div>
+                               <Button
+                                 onClick={() => handleViewData(selectedSymbol, timeframe)}
+                                 variant="ghost"
+                                 size="sm"
+                                 disabled={count === 0}
+                                 className="h-8 hover:bg-slate-100"
+                               >
+                                 View Data <ArrowRight className="h-3 w-3 ml-1" />
+                               </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  {/* Latest Data Preview */}
+                  {symbolData.latestData && (
+                    <Card className="border-slate-200 shadow-sm">
+                      <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-4 px-6">
+                        <CardTitle className="text-base font-semibold">Latest Market Data</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-sm">
+                              <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                 <tr>
+                                    <th className="px-6 py-3 text-left">Timeframe</th>
+                                    <th className="px-6 py-3 text-left">Date</th>
+                                    <th className="px-6 py-3 text-right">Close Price</th>
+                                    <th className="px-6 py-3 text-right">Return %</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                 {Object.entries(symbolData.latestData).map(([timeframe, data]) => {
+                                    if (!data) return null;
+                                    const info = TIMEFRAME_INFO[timeframe as keyof typeof TIMEFRAME_INFO];
+                                    if (!info) return null;
+                                    const record = data as LatestDataRecord;
+                                    const Icon = info.icon;
+
+                                    return (
+                                       <tr key={timeframe} className="hover:bg-slate-50/50">
+                                          <td className="px-6 py-4">
+                                             <div className="flex items-center gap-2">
+                                                <Icon className={cn("h-4 w-4", info.color)} />
+                                                <span className="font-medium text-slate-700">{info.name}</span>
+                                             </div>
+                                          </td>
+                                          <td className="px-6 py-4 text-slate-600">
+                                             {new Date(record.date).toLocaleDateString()}
+                                          </td>
+                                          <td className="px-6 py-4 text-right font-mono text-slate-700">
+                                             {record.close.toFixed(2)}
+                                          </td>
+                                          <td className="px-6 py-4 text-right">
+                                             {record.returnPercentage !== null ? (
+                                                <span className={cn(
+                                                   "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                                                   record.returnPercentage >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                                )}>
+                                                   {record.returnPercentage > 0 ? '+' : ''}{record.returnPercentage}%
+                                                </span>
+                                             ) : <span className="text-slate-300">-</span>}
+                                          </td>
+                                       </tr>
+                                    );
+                                 })}
+                              </tbody>
+                           </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <Database className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 font-medium">No calculated data found for {selectedSymbol}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="progress-container">
-          <div className="progress-text">
-            <span>Uploading...</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="progress-bar-bg">
-            <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
-          </div>
+
+        {/* Sidebar: Recent Updates */}
+        <div className="space-y-6">
+          <Card className="border-0 shadow-lg shadow-slate-200/40 ring-1 ring-slate-200 h-full flex flex-col bg-white">
+            <CardHeader className="bg-white border-b border-slate-50 py-5 px-6">
+              <div className="flex items-center gap-2">
+                 <Activity className="h-5 w-5 text-emerald-600" />
+                 <CardTitle className="text-base font-bold text-slate-800">Recently Updated</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+               {statsData?.recentlyUpdated?.length > 0 ? (
+                 <div className="space-y-4">
+                   {statsData.recentlyUpdated.map((symbol: any) => (
+                     <div 
+                        key={symbol.symbol} 
+                        onClick={() => setSelectedSymbol(symbol.symbol)}
+                        className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-100/30 transition-all cursor-pointer"
+                     >
+                       <div className="flex items-center space-x-3">
+                         <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
+                           {symbol.symbol.substring(0, 1)}
+                         </div>
+                         <div className="min-w-0">
+                           <div className="font-semibold text-sm text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{symbol.symbol}</div>
+                           <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                             <Clock className="h-3 w-3" />
+                             {new Date(symbol.lastUpdated).toLocaleDateString()}
+                           </div>
+                         </div>
+                       </div>
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         className="h-7 w-7 p-0 text-slate-300 group-hover:text-indigo-600"
+                       >
+                         <Eye className="h-4 w-4" />
+                       </Button>
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <div className="text-center py-8 text-xs text-slate-400 italic">
+                    No recent updates
+                 </div>
+               )}
+            </CardContent>
+          </Card>
         </div>
+      </div>
+
+      {/* Data Viewer Modal */}
+      {selectedSymbol && (
+        <DataViewerModal
+          isOpen={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          symbol={selectedSymbol}
+          timeframe={viewerTab}
+        />
       )}
     </div>
   );
-};
-
-// --- MOCK DATA ---
-const INITIAL_FILES = [
-  { id: 1, name: "annual_report_2024.pdf", size: "2.4 MB", uploaded: "Just now", status: "Processing" },
-  { id: 2, name: "dashboard_mockup.fig", size: "15.8 MB", uploaded: "2 hours ago", status: "Completed" },
-  { id: 3, name: "client_list_q3.csv", size: "450 KB", uploaded: "Yesterday", status: "Completed" },
-  { id: 4, name: "server_logs_error.txt", size: "1.2 MB", uploaded: "2 days ago", status: "Failed" },
-  { id: 5, name: "project_proposal.docx", size: "3.2 MB", uploaded: "3 days ago", status: "Completed" },
-];
-
-// --- MAIN APP COMPONENT ---
-export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState("Dashboard");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [files, setFiles] = useState(INITIAL_FILES);
-  const [toasts, setToasts] = useState<{id: number, message: string, type: string}[]>([]);
-
-  // Toast Helper
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
-  };
-
-  const handleFileUpload = (file: File) => {
-    // Logic to add file to list
-    const newFile = {
-      id: Date.now(),
-      name: file.name,
-      size: `${(file.size / (1024*1024)).toFixed(2)} MB`,
-      uploaded: "Just now",
-      status: "Completed"
-    };
-    setFiles([newFile, ...files]);
-    showToast(`File "${file.name}" uploaded successfully!`);
-  };
-
-  const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to delete this file?")) {
-      setFiles(files.filter(f => f.id !== id));
-      showToast("File deleted", "error");
-    }
-  };
-
-  return (
-    <>
-      <style>{STYLES}</style>
-      <div className="app-container">
-        
-        {/* Sidebar */}
-        <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
-          <div className="sidebar-logo">
-            AdminPanel
-          </div>
-          <nav className="sidebar-nav">
-            {['Dashboard', 'Files', 'Users', 'Settings'].map(item => {
-              const Icon = Icons[item === 'Dashboard' ? 'LayoutDashboard' : item as keyof typeof Icons] || Icons.Folder;
-              return (
-                <div 
-                  key={item} 
-                  className={`nav-item ${activeTab === item ? 'active' : ''}`}
-                  onClick={() => { setActiveTab(item); setMobileMenuOpen(false); }}
-                >
-                  <Icon width={18} height={18} />
-                  <span>{item}</span>
-                </div>
-              );
-            })}
-          </nav>
-        </aside>
-
-        {/* Main Content */}
-        <main className="main-content">
-          
-          {/* Header */}
-          <header className="header">
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <button className="icon-btn mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                <Icons.Menu />
-              </button>
-              <div className="header-search">
-                <Icons.Search color="#94a3b8" />
-                <input type="text" placeholder="Search..." />
-              </div>
-            </div>
-            
-            <div className="header-right">
-              <button className="icon-btn">
-                <Icons.Bell />
-              </button>
-              <div className="avatar">A</div>
-            </div>
-          </header>
-
-          {/* Body */}
-          <div className="content-area">
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h1 className="page-title">{activeTab} Overview</h1>
-              <button className="btn btn-primary">
-                <Icons.Upload width={16} height={16} />
-                <span>Export Report</span>
-              </button>
-            </div>
-
-            {/* Stats Row */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-label">Total Storage</div>
-                <div className="stat-value">845 GB</div>
-                <div className="stat-trend trend-up">
-                  <Icons.LayoutDashboard width={14} height={14} /> 12% increase
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Active Users</div>
-                <div className="stat-value">1,234</div>
-                <div className="stat-trend trend-up">
-                  <Icons.Users width={14} height={14} /> 5% increase
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">System Status</div>
-                <div className="stat-value" style={{ color: 'var(--success-text)' }}>99.9%</div>
-                <div className="stat-trend">
-                  <Icons.CheckCircle width={14} height={14} /> Operational
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Pending Issues</div>
-                <div className="stat-value">3</div>
-                <div className="stat-trend trend-down">
-                  <Icons.AlertTriangle width={14} height={14} /> Action needed
-                </div>
-              </div>
-            </div>
-
-            {/* File Upload Section */}
-            <FileUploader onUpload={handleFileUpload} />
-
-            {/* Data Table */}
-            <div className="table-card">
-              <div className="table-header">
-                <div className="table-title">Recent Files</div>
-                <button className="icon-btn"><Icons.MoreVertical /></button>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>File Name</th>
-                      <th>Size</th>
-                      <th>Uploaded</th>
-                      <th>Status</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {files.map(file => (
-                      <tr key={file.id}>
-                        <td style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 500 }}>
-                          <div style={{ padding: '8px', background: '#f1f5f9', borderRadius: '6px', color: '#6366f1' }}>
-                            <Icons.FileText width={16} height={16} />
-                          </div>
-                          {file.name}
-                        </td>
-                        <td>{file.size}</td>
-                        <td>{file.uploaded}</td>
-                        <td><StatusBadge status={file.status} /></td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-icon-only" onClick={() => handleDelete(file.id)}>
-                            <Icons.Trash width={16} height={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {files.length === 0 && (
-                      <tr>
-                        <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>
-                          No files found. Upload one above.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-        </main>
-
-        {/* Toast Container */}
-        <div className="toast-container">
-          {toasts.map(t => (
-            <div key={t.id} className={`toast toast-${t.type}`}>
-              {t.type === 'error' ? <Icons.AlertTriangle color="var(--error-text)" /> : <Icons.CheckCircle color="var(--success-text)" />}
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '2px' }}>
-                  {t.type === 'error' ? 'Error' : 'Success'}
-                </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-sub)' }}>{t.message}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Overlay for mobile sidebar */}
-        {mobileMenuOpen && (
-          <div 
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 45 }}
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
-
-      </div>
-    </>
-  );
 }
-
 ```
