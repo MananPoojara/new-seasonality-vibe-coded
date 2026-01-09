@@ -835,14 +835,14 @@ export default function AdminPage() {
                                                          <span>View Error Log</span>
                                                          <ChevronDown className="h-3 w-3 transition-transform group-open/details:rotate-180" />
                                                       </summary>
-                                                      <div className="absolute right-0 top-full mt-2 w-96 z-50 origin-top-right rounded-xl bg-slate-900 p-4 shadow-2xl ring-1 ring-slate-900/10 animate-in fade-in zoom-in-95 slide-in-from-top-2">
+                                                      <div className="absolute right-0 top-full mt-2 w-[500px] max-w-[85vw] z-50 origin-top-right rounded-xl bg-slate-900 p-4 shadow-2xl ring-1 ring-slate-900/10 animate-in fade-in zoom-in-95 slide-in-from-top-2">
                                                          <div className="flex items-start gap-3">
-                                                            <div className="mt-0.5 p-1 bg-rose-500/20 rounded">
+                                                            <div className="mt-0.5 p-1 bg-rose-500/20 rounded shrink-0">
                                                                <AlertCircle className="h-4 w-4 text-rose-400" />
                                                             </div>
-                                                            <div className="space-y-1 w-full">
-                                                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">System Error</p>
-                                                               <div className="text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 whitespace-pre-wrap break-words leading-relaxed max-h-60 overflow-y-auto">
+                                                            <div className="space-y-1 w-full min-w-0">
+                                                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">System Error Details</p>
+                                                               <div className="text-xs text-slate-300 font-mono bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 whitespace-pre-wrap break-words leading-relaxed select-text">
                                                                   {file.error}
                                                                </div>
                                                             </div>
