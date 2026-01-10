@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {Button}  from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Loading } from '@/components/ui/loading';
 import { 
   Database, Search, Calendar, 
   BarChart3, TrendingUp, Archive, ExternalLink, Eye, Trash2,
-  Clock, ArrowRight, Activity, AlertTriangle
+  Clock, ArrowRight, Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
@@ -73,9 +73,14 @@ const formatDate = (dateString: string | Date): string => {
 };
 export function CalculatedDataSection() {
   const [searchSymbol, setSearchSymbol] = useState('');
+  const queryClient = useQueryClient();
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerTab, setViewerTab] = useState('daily');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Fetch analysis stats
   const { data: statsData, isLoading: statsLoading } = useQuery({
@@ -85,6 +90,44 @@ export function CalculatedDataSection() {
       return response.data.data;
     },
   });
+
+  // Fetch all symbols for autocomplete
+  const { data: allSymbols } = useQuery({
+    queryKey: ['all-symbols'],
+    queryFn: async () => {
+      const response = await api.get('/analysis/symbols');
+      // Extract just the symbol names from the response
+      return (response.data.data || []).map((s: any) => s.symbol);
+    },
+  });
+
+  // Filter symbols based on search input
+  const filteredSymbols = searchSymbol.trim().length > 0 
+    ? (allSymbols || []).filter((s: string) => 
+        s.toLowerCase().includes(searchSymbol.toLowerCase())
+      ).slice(0, 8) // Limit to 8 suggestions
+    : [];
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current && 
+        !suggestionsRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Reset highlighted index when filtered symbols change
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [filteredSymbols.length]);
 
   // Fetch symbol data
   const { data: symbolData, isLoading: symbolLoading } = useQuery({
@@ -103,6 +146,46 @@ export function CalculatedDataSection() {
       return;
     }
     setSelectedSymbol(searchSymbol.toUpperCase().trim());
+    setShowSuggestions(false);
+  };
+
+  const handleSelectSuggestion = (symbol: string) => {
+    setSearchSymbol(symbol);
+    setSelectedSymbol(symbol);
+    setShowSuggestions(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || filteredSymbols.length === 0) {
+      if (e.key === 'Enter') handleSearchSymbol();
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex(prev => 
+          prev < filteredSymbols.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex(prev => 
+          prev > 0 ? prev - 1 : filteredSymbols.length - 1
+        );
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightedIndex >= 0) {
+          handleSelectSuggestion(filteredSymbols[highlightedIndex]);
+        } else {
+          handleSearchSymbol();
+        }
+        break;
+      case 'Escape':
+        setShowSuggestions(false);
+        break;
+    }
   };
 
   const handleViewData = async (symbol: string, timeframe: string) => {
@@ -121,10 +204,11 @@ export function CalculatedDataSection() {
       if (response.data.success) {
         toast.success(`${symbol} deleted successfully. ${response.data.data.totalDeleted} records removed.`);
         setSelectedSymbol(null);
+        setSearchSymbol('');
         // Use a more gentle refresh approach
-        setTimeout(() => {
-          window.location.href = window.location.pathname;
-        }, 2000);
+        queryClient.invalidateQueries({ queryKey: ['analysis-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['all-symbols'] });
+
       }
     } catch (err: any) {
       console.error('Delete error:', err);
@@ -221,14 +305,51 @@ export function CalculatedDataSection() {
             <CardContent className="p-8">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 z-10" />
                   <Input
+                    ref={inputRef}
                     placeholder="Enter symbol (e.g., RELIANCE, NIFTY)"
                     value={searchSymbol}
-                    onChange={(e) => setSearchSymbol(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearchSymbol()}
+                    onChange={(e) => {
+                      setSearchSymbol(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onKeyDown={handleKeyDown}
                     className="pl-10 h-12 text-lg"
                   />
+                  {/* Autocomplete Dropdown */}
+                  {showSuggestions && filteredSymbols.length > 0 && (
+                    <div 
+                      ref={suggestionsRef}
+                      className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden"
+                    >
+                      {filteredSymbols.map((symbol: string, index: number) => (
+                        <button
+                          key={symbol}
+                          onClick={() => handleSelectSuggestion(symbol)}
+                          className={cn(
+                            "w-full px-4 py-3 text-left flex items-center gap-3 transition-colors",
+                            index === highlightedIndex 
+                              ? "bg-indigo-50 text-indigo-700" 
+                              : "hover:bg-slate-50 text-slate-700"
+                          )}
+                        >
+                          <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs shrink-0">
+                            {symbol.substring(0, 2)}
+                          </div>
+                          <span className="font-medium">
+                            {/* Highlight matching text */}
+                            {symbol.split(new RegExp(`(${searchSymbol})`, 'gi')).map((part, i) => 
+                              part.toLowerCase() === searchSymbol.toLowerCase() 
+                                ? <span key={i} className="text-indigo-600 font-semibold">{part}</span>
+                                : part
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Button 
                   onClick={handleSearchSymbol} 

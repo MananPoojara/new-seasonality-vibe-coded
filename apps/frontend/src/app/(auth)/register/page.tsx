@@ -182,98 +182,113 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [mouseX, setMouseX] = useState<number>(0);
   const [mouseY, setMouseY] = useState<number>(0);
-  const [isPurpleBlinking, setIsPurpleBlinking] = useState(false);
-  const [isBlackBlinking, setIsBlackBlinking] = useState(false);
+  const [isTealBlinking, setIsTealBlinking] = useState(false);
+  const [isSlateBlinking, setIsSlateBlinking] = useState(false);
+  const [isPinkBlinking, setIsPinkBlinking] = useState(false);
+  const [isLimeBlinking, setIsLimeBlinking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false);
-  const purpleRef = useRef<HTMLDivElement>(null);
-  const blackRef = useRef<HTMLDivElement>(null);
-  const yellowRef = useRef<HTMLDivElement>(null);
-  const orangeRef = useRef<HTMLDivElement>(null);
+  
+  // Unique animations for register page
+  const [isWaving, setIsWaving] = useState(true); // Wave on page load
+  const [isBouncing, setIsBouncing] = useState(false); // Bounce when typing
+  const [isCelebrating, setIsCelebrating] = useState(false); // Celebrate when form is filled
+  const [filledFields, setFilledFields] = useState(0);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false); // Track if typing in password fields
+  
+  const tealRef = useRef<HTMLDivElement>(null);
+  const slateRef = useRef<HTMLDivElement>(null);
+  const pinkRef = useRef<HTMLDivElement>(null);
+  const limeRef = useRef<HTMLDivElement>(null);
 
+  // Mouse tracking
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       setMouseX(e.clientX);
       setMouseY(e.clientY);
     };
-
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  // Blinking effects
-  useEffect(() => {
-    const getRandomBlinkInterval = () => Math.random() * 4000 + 3000;
-
-    const scheduleBlink = () => {
-      const blinkTimeout = setTimeout(() => {
-        setIsPurpleBlinking(true);
-        setTimeout(() => {
-          setIsPurpleBlinking(false);
-          scheduleBlink();
-        }, 150);
-      }, getRandomBlinkInterval());
-
-      return blinkTimeout;
-    };
-
-    const timeout = scheduleBlink();
-    return () => clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    const getRandomBlinkInterval = () => Math.random() * 4000 + 3000;
-
-    const scheduleBlink = () => {
-      const blinkTimeout = setTimeout(() => {
-        setIsBlackBlinking(true);
-        setTimeout(() => {
-          setIsBlackBlinking(false);
-          scheduleBlink();
-        }, 150);
-      }, getRandomBlinkInterval());
-
-      return blinkTimeout;
-    };
-
-    const timeout = scheduleBlink();
-    return () => clearTimeout(timeout);
-  }, []);
-
-  // Looking at each other when typing
-  useEffect(() => {
-    if (isTyping) {
-      setIsLookingAtEachOther(true);
-      const timer = setTimeout(() => {
-        setIsLookingAtEachOther(false);
-      }, 800);
-      return () => clearTimeout(timer);
-    } else {
-      setIsLookingAtEachOther(false);
-    }
-  }, [isTyping]);
-
+  // Calculate position for face tracking
   const calculatePosition = (ref: React.RefObject<HTMLDivElement | null>) => {
-    if (!ref.current) return { faceX: 0, faceY: 0, bodyRotation: 0 };
-
+    if (!ref.current) return { faceX: 0, faceY: 0 };
     const rect = ref.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 3;
-
     const deltaX = mouseX - centerX;
     const deltaY = mouseY - centerY;
-
     const faceX = Math.max(-15, Math.min(15, deltaX / 20));
     const faceY = Math.max(-10, Math.min(10, deltaY / 30));
-    const bodySkew = Math.max(-6, Math.min(6, -deltaX / 120));
-
-    return { faceX, faceY, bodySkew };
+    return { faceX, faceY };
   };
 
-  const purplePos = calculatePosition(purpleRef);
-  const blackPos = calculatePosition(blackRef);
-  const yellowPos = calculatePosition(yellowRef);
-  const orangePos = calculatePosition(orangeRef);
+  const tealPos = calculatePosition(tealRef);
+  const slatePos = calculatePosition(slateRef);
+  const pinkPos = calculatePosition(pinkRef);
+  const limePos = calculatePosition(limeRef);
+
+  // Wave animation on page load - characters wave hello
+  useEffect(() => {
+    const waveTimer = setTimeout(() => setIsWaving(false), 2500);
+    return () => clearTimeout(waveTimer);
+  }, []);
+
+  // Bounce animation when user starts typing
+  useEffect(() => {
+    if (isTyping && !isBouncing) {
+      setIsBouncing(true);
+      const bounceTimer = setTimeout(() => setIsBouncing(false), 600);
+      return () => clearTimeout(bounceTimer);
+    }
+  }, [isTyping]);
+
+  // Track filled fields for celebration
+  useEffect(() => {
+    let count = 0;
+    if (name.length > 0) count++;
+    if (email.length > 0) count++;
+    if (password.length > 0) count++;
+    if (confirmPassword.length > 0) count++;
+    setFilledFields(count);
+    
+    // Celebrate when all fields are filled
+    if (count === 4 && !isCelebrating) {
+      setIsCelebrating(true);
+      const celebrateTimer = setTimeout(() => setIsCelebrating(false), 1500);
+      return () => clearTimeout(celebrateTimer);
+    }
+  }, [name, email, password, confirmPassword]);
+
+  // Blinking effects for all characters
+  useEffect(() => {
+    const scheduleBlink = (setter: (v: boolean) => void, minDelay: number, maxDelay: number) => {
+      const getInterval = () => Math.random() * (maxDelay - minDelay) + minDelay;
+      const blink = () => {
+        const timeout = setTimeout(() => {
+          setter(true);
+          setTimeout(() => {
+            setter(false);
+            blink();
+          }, 150);
+        }, getInterval());
+        return timeout;
+      };
+      return blink();
+    };
+
+    const t1 = scheduleBlink(setIsTealBlinking, 3000, 5000);
+    const t2 = scheduleBlink(setIsSlateBlinking, 2500, 4500);
+    const t3 = scheduleBlink(setIsPinkBlinking, 3500, 5500);
+    const t4 = scheduleBlink(setIsLimeBlinking, 2800, 4800);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -306,215 +321,266 @@ export default function RegisterPage() {
         </div>
 
         <div className="relative z-20 flex items-end justify-center h-[500px]">
-          {/* New Unique Characters for Sign-up */}
+          {/* Cartoon Characters with unique register page animations */}
           <div className="relative" style={{ width: '550px', height: '400px' }}>
             
-            {/* Teal Diamond Character - Back left */}
+            {/* Teal tall rectangle character - Back layer - WAVES on load */}
             <div
-              ref={purpleRef}
-              className="absolute bottom-0 transition-all duration-700 ease-in-out"
+              ref={tealRef}
+              className="absolute bottom-0 transition-all duration-500 ease-out"
               style={{
-                left: '50px',
-                width: '120px',
-                height: isTyping ? '350px' : '320px',
+                left: '70px',
+                width: '180px',
+                height: '400px',
                 backgroundColor: '#14B8A6',
-                clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+                borderRadius: '10px 10px 0 0',
                 zIndex: 1,
-                transform: isTyping ? `rotate(-5deg) translateX(15px)` : `rotate(${(purplePos.bodySkew || 0) * 2}deg)`,
+                transform: isCelebrating 
+                  ? 'rotate(-5deg) translateY(-20px)' 
+                  : isWaving 
+                    ? 'rotate(8deg)' 
+                    : isBouncing 
+                      ? 'translateY(-15px)' 
+                      : 'rotate(0deg)',
                 transformOrigin: 'bottom center',
               }}
             >
-              {/* Eyes positioned for diamond shape */}
+              {/* Waving arm - only shows during wave */}
+              {isWaving && (
+                <div
+                  className="absolute bg-[#0D9488] rounded-full animate-pulse"
+                  style={{
+                    right: '-30px',
+                    top: '60px',
+                    width: '50px',
+                    height: '20px',
+                    borderRadius: '10px',
+                    transform: 'rotate(-30deg)',
+                    animation: 'wave 0.4s ease-in-out infinite alternate',
+                  }}
+                />
+              )}
+              {/* Eyes */}
               <div
-                className="absolute flex gap-6 transition-all duration-700 ease-in-out"
+                className="absolute flex gap-8 transition-all duration-300 ease-out"
                 style={{
-                  left: isLookingAtEachOther ? `${35}px` : `${30 + purplePos.faceX}px`,
-                  top: isLookingAtEachOther ? `${80}px` : `${75 + purplePos.faceY}px`,
+                  left: isPasswordFocused && !showPassword ? '20px' : `${45 + tealPos.faceX}px`,
+                  top: isPasswordFocused && !showPassword ? '60px' : `${40 + tealPos.faceY}px`,
                 }}
               >
                 <EyeBall
-                  size={16}
-                  pupilSize={6}
-                  maxDistance={4}
+                  size={18}
+                  pupilSize={7}
+                  maxDistance={5}
                   eyeColor="white"
                   pupilColor="#2D2D2D"
-                  isBlinking={isPurpleBlinking}
-                  forceLookX={isLookingAtEachOther ? 4 : undefined}
-                  forceLookY={isLookingAtEachOther ? 2 : undefined}
+                  isBlinking={isTealBlinking}
+                  forceLookX={isPasswordFocused && !showPassword ? -4 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
                 />
                 <EyeBall
-                  size={16}
-                  pupilSize={6}
-                  maxDistance={4}
+                  size={18}
+                  pupilSize={7}
+                  maxDistance={5}
                   eyeColor="white"
                   pupilColor="#2D2D2D"
-                  isBlinking={isPurpleBlinking}
-                  forceLookX={isLookingAtEachOther ? 4 : undefined}
-                  forceLookY={isLookingAtEachOther ? 2 : undefined}
+                  isBlinking={isTealBlinking}
+                  forceLookX={isPasswordFocused && !showPassword ? -4 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
                 />
               </div>
-            </div>
-
-            {/* Pink Hexagon Character - Back right */}
-            <div
-              ref={blackRef}
-              className="absolute bottom-0 transition-all duration-700 ease-in-out"
-              style={{
-                left: '380px',
-                width: '140px',
-                height: '280px',
-                backgroundColor: '#EC4899',
-                clipPath: 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)',
-                zIndex: 1,
-                transform: isLookingAtEachOther ? `rotate(8deg) translateX(-20px)` : `rotate(${(blackPos.bodySkew || 0) * -1.5}deg)`,
-                transformOrigin: 'bottom center',
-              }}
-            >
-              <div
-                className="absolute flex gap-5 transition-all duration-700 ease-in-out"
-                style={{
-                  left: isLookingAtEachOther ? `${45}px` : `${40 + blackPos.faceX}px`,
-                  top: isLookingAtEachOther ? `${60}px` : `${55 + blackPos.faceY}px`,
-                }}
-              >
-                <EyeBall
-                  size={14}
-                  pupilSize={5}
-                  maxDistance={3}
-                  eyeColor="white"
-                  pupilColor="#2D2D2D"
-                  isBlinking={isBlackBlinking}
-                  forceLookX={isLookingAtEachOther ? -3 : undefined}
-                  forceLookY={isLookingAtEachOther ? -2 : undefined}
+              {/* Happy smile when celebrating */}
+              {isCelebrating && (
+                <div
+                  className="absolute w-16 h-8 border-b-4 border-[#2D2D2D] rounded-b-full"
+                  style={{ left: '55px', top: '75px' }}
                 />
-                <EyeBall
-                  size={14}
-                  pupilSize={5}
-                  maxDistance={3}
-                  eyeColor="white"
-                  pupilColor="#2D2D2D"
-                  isBlinking={isBlackBlinking}
-                  forceLookX={isLookingAtEachOther ? -3 : undefined}
-                  forceLookY={isLookingAtEachOther ? -2 : undefined}
-                />
-              </div>
+              )}
             </div>
 
-            {/* Lime Green Triangle Character - Front left */}
+            {/* Dark slate tall rectangle character - Middle layer - JUMPS when typing */}
             <div
-              ref={orangeRef}
-              className="absolute bottom-0 transition-all duration-700 ease-in-out"
+              ref={slateRef}
+              className="absolute bottom-0 transition-all duration-300 ease-out"
               style={{
-                left: '20px',
-                width: '200px',
-                height: '240px',
-                backgroundColor: '#84CC16',
-                clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-                zIndex: 3,
-                transform: `rotate(${(orangePos.bodySkew || 0) * 3}deg)`,
-                transformOrigin: 'bottom center',
-              }}
-            >
-              {/* Eyes positioned for triangle */}
-              <div
-                className="absolute flex gap-7 transition-all duration-200 ease-out"
-                style={{
-                  left: `${70 + (orangePos.faceX || 0)}px`,
-                  top: `${60 + (orangePos.faceY || 0)}px`,
-                }}
-              >
-                <Pupil size={10} maxDistance={4} pupilColor="#2D2D2D" />
-                <Pupil size={10} maxDistance={4} pupilColor="#2D2D2D" />
-              </div>
-              {/* Triangle smile */}
-              <div
-                className="absolute w-12 h-[2px] bg-[#2D2D2D] transition-all duration-200 ease-out"
-                style={{
-                  left: `${75 + (orangePos.faceX || 0)}px`,
-                  top: `${100 + (orangePos.faceY || 0)}px`,
-                  borderRadius: '0 0 15px 15px',
-                  height: '6px',
-                }}
-              />
-            </div>
-
-            {/* Cyan Star Character - Front center */}
-            <div
-              ref={yellowRef}
-              className="absolute bottom-0 transition-all duration-700 ease-in-out"
-              style={{
-                left: '200px',
-                width: '160px',
-                height: '200px',
-                backgroundColor: '#06B6D4',
-                clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
-                zIndex: 4,
-                transform: `rotate(${(yellowPos.bodySkew || 0) * -2}deg)`,
-                transformOrigin: 'bottom center',
-              }}
-            >
-              {/* Eyes for star shape */}
-              <div
-                className="absolute flex gap-5 transition-all duration-200 ease-out"
-                style={{
-                  left: `${60 + (yellowPos.faceX || 0)}px`,
-                  top: `${50 + (yellowPos.faceY || 0)}px`,
-                }}
-              >
-                <Pupil size={11} maxDistance={4} pupilColor="#2D2D2D" />
-                <Pupil size={11} maxDistance={4} pupilColor="#2D2D2D" />
-              </div>
-              {/* Star sparkle mouth */}
-              <div
-                className="absolute transition-all duration-200 ease-out"
-                style={{
-                  left: `${72 + (yellowPos.faceX || 0)}px`,
-                  top: `${85 + (yellowPos.faceY || 0)}px`,
-                  width: '16px',
-                  height: '16px',
-                  backgroundColor: '#2D2D2D',
-                  clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
-                }}
-              />
-            </div>
-
-            {/* Violet Oval Character - Front right */}
-            <div
-              className="absolute bottom-0 transition-all duration-700 ease-in-out"
-              style={{
-                left: '320px',
-                width: '100px',
-                height: '300px',
-                backgroundColor: '#8B5CF6',
-                borderRadius: '50px',
+                left: '240px',
+                width: '120px',
+                height: '310px',
+                backgroundColor: '#334155',
+                borderRadius: '8px 8px 0 0',
                 zIndex: 2,
-                transform: `skewX(${(orangePos.bodySkew || 0) * -1}deg)`,
+                transform: isCelebrating 
+                  ? 'translateY(-30px) scale(1.05)' 
+                  : isWaving 
+                    ? 'translateY(-10px)' 
+                    : isBouncing 
+                      ? 'translateY(-25px) scale(1.02)' 
+                      : 'translateY(0)',
                 transformOrigin: 'bottom center',
               }}
             >
-              {/* Oval eyes */}
+              {/* Eyes */}
               <div
-                className="absolute flex gap-4 transition-all duration-200 ease-out"
+                className="absolute flex gap-6 transition-all duration-300 ease-out"
                 style={{
-                  left: `${30 + (orangePos.faceX || 0)}px`,
-                  top: `${60 + (orangePos.faceY || 0)}px`,
+                  left: isPasswordFocused && !showPassword ? '10px' : `${26 + slatePos.faceX}px`,
+                  top: isPasswordFocused && !showPassword ? '50px' : `${32 + slatePos.faceY}px`,
                 }}
               >
-                <Pupil size={9} maxDistance={3} pupilColor="#2D2D2D" />
-                <Pupil size={9} maxDistance={3} pupilColor="#2D2D2D" />
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
+                  isBlinking={isSlateBlinking}
+                  forceLookX={isPasswordFocused && !showPassword ? -4 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
+                />
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
+                  isBlinking={isSlateBlinking}
+                  forceLookX={isPasswordFocused && !showPassword ? -4 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
+                />
               </div>
-              {/* Oval smile */}
+              {/* Excited eyebrows when bouncing */}
+              {(isBouncing || isCelebrating) && (
+                <>
+                  <div className="absolute w-4 h-1 bg-white rounded-full" style={{ left: '26px', top: '24px', transform: 'rotate(-15deg)' }} />
+                  <div className="absolute w-4 h-1 bg-white rounded-full" style={{ left: '58px', top: '24px', transform: 'rotate(15deg)' }} />
+                </>
+              )}
+            </div>
+
+            {/* Pink semi-circle character - Front left - WOBBLES happily */}
+            <div
+              ref={pinkRef}
+              className="absolute bottom-0 transition-all duration-400 ease-out"
+              style={{
+                left: '0px',
+                width: '240px',
+                height: '200px',
+                zIndex: 3,
+                backgroundColor: '#F472B6',
+                borderRadius: '120px 120px 0 0',
+                transform: isCelebrating 
+                  ? 'rotate(5deg) scale(1.05)' 
+                  : isWaving 
+                    ? 'rotate(-5deg)' 
+                    : isBouncing 
+                      ? 'rotate(3deg)' 
+                      : 'rotate(0deg)',
+                transformOrigin: 'bottom center',
+              }}
+            >
+              {/* Eyes - just pupils */}
               <div
-                className="absolute w-10 h-[2px] bg-[#2D2D2D] rounded-full transition-all duration-200 ease-out"
+                className="absolute flex gap-8 transition-all duration-200 ease-out"
                 style={{
-                  left: `${32 + (orangePos.faceX || 0)}px`,
-                  top: `${90 + (orangePos.faceY || 0)}px`,
-                  borderRadius: '0 0 12px 12px',
-                  height: '5px',
+                  left: isPasswordFocused && !showPassword ? '50px' : `${82 + (pinkPos.faceX || 0)}px`,
+                  top: isPasswordFocused && !showPassword ? '70px' : `${90 + (pinkPos.faceY || 0)}px`,
+                }}
+              >
+                <Pupil 
+                  size={12} 
+                  maxDistance={5} 
+                  pupilColor="#2D2D2D" 
+                  forceLookX={isPasswordFocused && !showPassword ? -5 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
+                />
+                <Pupil 
+                  size={12} 
+                  maxDistance={5} 
+                  pupilColor="#2D2D2D"
+                  forceLookX={isPasswordFocused && !showPassword ? -5 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
+                />
+              </div>
+              {/* Blush cheeks when celebrating */}
+              {isCelebrating && (
+                <>
+                  <div className="absolute w-6 h-4 bg-[#F9A8D4] rounded-full opacity-60" style={{ left: '60px', top: '105px' }} />
+                  <div className="absolute w-6 h-4 bg-[#F9A8D4] rounded-full opacity-60" style={{ left: '130px', top: '105px' }} />
+                </>
+              )}
+            </div>
+
+            {/* Lime tall rounded character - Front right - SWAYS side to side */}
+            <div
+              ref={limeRef}
+              className="absolute bottom-0 transition-all duration-500 ease-out"
+              style={{
+                left: '310px',
+                width: '140px',
+                height: '230px',
+                backgroundColor: '#A3E635',
+                borderRadius: '70px 70px 0 0',
+                zIndex: 4,
+                transform: isCelebrating 
+                  ? 'rotate(-8deg) translateY(-15px)' 
+                  : isWaving 
+                    ? 'rotate(6deg)' 
+                    : isBouncing 
+                      ? 'rotate(-4deg)' 
+                      : 'rotate(0deg)',
+                transformOrigin: 'bottom center',
+              }}
+            >
+              {/* Eyes with white eyeballs */}
+              <div
+                className="absolute flex gap-6 transition-all duration-200 ease-out"
+                style={{
+                  left: isPasswordFocused && !showPassword ? '20px' : `${42 + (limePos.faceX || 0)}px`,
+                  top: isPasswordFocused && !showPassword ? '55px' : `${40 + (limePos.faceY || 0)}px`,
+                }}
+              >
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
+                  isBlinking={isLimeBlinking}
+                  forceLookX={isPasswordFocused && !showPassword ? -5 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
+                />
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
+                  isBlinking={isLimeBlinking}
+                  forceLookX={isPasswordFocused && !showPassword ? -5 : undefined}
+                  forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
+                />
+              </div>
+              {/* Mouth - changes to smile when celebrating */}
+              <div
+                className={`absolute rounded-full transition-all duration-300 ${isCelebrating ? 'w-12 h-6 border-b-4 border-[#2D2D2D] bg-transparent rounded-b-full' : 'w-20 h-[4px] bg-[#2D2D2D]'}`}
+                style={{
+                  left: isCelebrating ? '44px' : `${40 + (limePos.faceX || 0)}px`,
+                  top: `${88 + (limePos.faceY || 0)}px`,
                 }}
               />
             </div>
 
+            {/* Progress indicator - shows filled fields */}
+            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    i < filledFields ? 'bg-white scale-125' : 'bg-white/30'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -534,6 +600,14 @@ export default function RegisterPage() {
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]" />
         <div className="absolute top-1/4 right-1/4 size-64 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 left-1/4 size-96 bg-white/5 rounded-full blur-3xl" />
+        
+        {/* Wave animation keyframes */}
+        <style jsx>{`
+          @keyframes wave {
+            0% { transform: rotate(-30deg); }
+            100% { transform: rotate(-50deg); }
+          }
+        `}</style>
       </div>
 
       {/* Right Register Section */}
@@ -594,6 +668,8 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
                   required
                   minLength={8}
                   className="h-12 pr-10 bg-background border-border/60 focus:border-emerald-500"
@@ -617,6 +693,8 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
                   required
                   className="h-12 pr-10 bg-background border-border/60 focus:border-emerald-500"
                 />

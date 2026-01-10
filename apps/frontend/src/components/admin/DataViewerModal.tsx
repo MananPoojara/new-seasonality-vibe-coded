@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X, Download, ChevronLeft, ChevronRight, Loader2, Table as TableIcon, Calendar, Hash, FileSpreadsheet } from 'lucide-react';
+import { X, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Table as TableIcon, Calendar, Hash, FileSpreadsheet } from 'lucide-react';
 import {Button}  from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
@@ -201,29 +201,54 @@ export function DataViewerModal({ isOpen, onClose, symbol, timeframe }: DataView
           <div className="text-sm text-slate-500 font-medium">
             Showing <span className="text-slate-900">{((page - 1) * PAGE_SIZE) + 1}</span> to <span className="text-slate-900">{Math.min(page * PAGE_SIZE, totalRecords)}</span> of <span className="text-slate-900">{totalRecords.toLocaleString()}</span> entries
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {/* First Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+              className="h-9 px-2 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+              title="First page"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            {/* Previous Button */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="h-9 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+              className="h-9 px-2 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+              title="Previous page"
             >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center justify-center h-9 min-w-[3rem] px-3 rounded-md bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700">
+            {/* Page Indicator */}
+            <div className="flex items-center justify-center h-9 min-w-[4rem] px-3 rounded-md bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700">
               {page} <span className="text-slate-400 mx-1">/</span> {totalPages}
             </div>
+            {/* Next Button */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="h-9 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+              className="h-9 px-2 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+              title="Next page"
             >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {/* Last Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(totalPages)}
+              disabled={page >= totalPages}
+              className="h-9 px-2 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 disabled:opacity-50"
+              title="Last page"
+            >
+              <ChevronsRight className="h-4 w-4" />
             </Button>
           </div>
         </div>

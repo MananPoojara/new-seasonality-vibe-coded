@@ -5,6 +5,22 @@
 
 const { normalizeColumnName } = require('./validators');
 
+// Month names lookup (centralized to avoid duplication)
+const MONTH_NAMES = {
+  'jan': 1, 'january': 1,
+  'feb': 2, 'february': 2,
+  'mar': 3, 'march': 3,
+  'apr': 4, 'april': 4,
+  'may': 5,
+  'jun': 6, 'june': 6,
+  'jul': 7, 'july': 7,
+  'aug': 8, 'august': 8,
+  'sep': 9, 'september': 9, 'sept': 9,
+  'oct': 10, 'october': 10,
+  'nov': 11, 'november': 11,
+  'dec': 12, 'december': 12
+};
+
 /**
  * Parse date string to Date object
  * Supports multiple date formats and automatically detects format
@@ -59,24 +75,133 @@ function parseDate(dateStr) {
       return null;
     },
 
-    // Strategy 4: MM/DD/YYYY format (US format)
+    // Strategy 4: DD-MMM-YY format (e.g., 09-Jan-26, 24-Dec-25) - 2-digit year - PRIORITY
     () => {
-      const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      const match = str.match(/^(\d{1,2})-([a-zA-Z]+)-(\d{2})$/);
       if (match) {
-        const [, month, day, year] = match;
-        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
-        // Only accept if day > 12 (clearly not DD/MM) or month <= 12
-        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
-          // Prefer DD/MM interpretation unless day > 12
-          if (d > 12 || m <= 12) {
-            return new Date(Date.UTC(y, m - 1, d));
-          }
+        const [, day, monthStr, yearStr] = match;
+        const d = parseInt(day);
+        const m = MONTH_NAMES[monthStr.toLowerCase()];
+        let y = parseInt(yearStr);
+        
+        if (!m) return null;
+        
+        // Convert 2-digit year to 4-digit year
+        // Assume 00-49 = 2000-2049, 50-99 = 1950-1999
+        if (y <= 49) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
         }
       }
       return null;
     },
 
-    // Strategy 5: DD.MM.YYYY format (European dot format)
+    // Strategy 5: DD MMM YY format (e.g., 24 Dec 24, 1 Jan 26) - 2-digit year
+    () => {
+      const match = str.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{2})$/);
+      if (match) {
+        const [, day, monthStr, yearStr] = match;
+        const d = parseInt(day);
+        const m = MONTH_NAMES[monthStr.toLowerCase()];
+        let y = parseInt(yearStr);
+        
+        if (!m) return null;
+        
+        if (y <= 49) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 6: DD/MM/YY format (e.g., 24/12/24, 1/1/26) - 2-digit year
+    () => {
+      const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+      if (match) {
+        const [, day, month, yearStr] = match;
+        const d = parseInt(day), m = parseInt(month);
+        let y = parseInt(yearStr);
+        
+        if (y <= 49) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 7: DD-MM-YY format (e.g., 24-12-24, 1-1-26) - 2-digit year
+    () => {
+      const match = str.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
+      if (match) {
+        const [, day, month, yearStr] = match;
+        const d = parseInt(day), m = parseInt(month);
+        let y = parseInt(yearStr);
+        
+        if (y <= 49) {
+          y += 2000;
+        } else {
+          y += 1900;
+        }
+        
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 8: DD-MMM-YYYY format (e.g., 24-Dec-2024) - 4-digit year
+    () => {
+      const match = str.match(/^(\d{1,2})-([a-zA-Z]+)-(\d{4})$/);
+      if (match) {
+        const [, day, monthStr, year] = match;
+        const d = parseInt(day), y = parseInt(year);
+        const m = MONTH_NAMES[monthStr.toLowerCase()];
+        
+        if (!m) return null;
+        
+        if (d >= 1 && d <= 31 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 9: DD MMM YYYY format (e.g., 24 Dec 2024) - 4-digit year
+    () => {
+      const match = str.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
+      if (match) {
+        const [, day, monthStr, year] = match;
+        const d = parseInt(day), y = parseInt(year);
+        const m = MONTH_NAMES[monthStr.toLowerCase()];
+        
+        if (!m) return null;
+        
+        if (d >= 1 && d <= 31 && y >= 1900 && y <= 2100) {
+          return new Date(Date.UTC(y, m - 1, d));
+        }
+      }
+      return null;
+    },
+
+    // Strategy 10: DD.MM.YYYY format (European dot format)
     () => {
       const match = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
       if (match) {
@@ -89,7 +214,7 @@ function parseDate(dateStr) {
       return null;
     },
 
-    // Strategy 6: YYYY/MM/DD format
+    // Strategy 11: YYYY/MM/DD format
     () => {
       const match = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
       if (match) {
@@ -102,186 +227,17 @@ function parseDate(dateStr) {
       return null;
     },
 
-    // Strategy 7: DD MMM YY format (e.g., 24 Dec 24, 1 Jan 26) - 2-digit year
-    () => {
-      const monthNames = {
-        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
-        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
-        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
-        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
-        'may': 5, 'May': 5,
-        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
-        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
-        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
-        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
-        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
-        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
-        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
-      };
-
-
-      const match = str.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{2})$/);
-      if (match) {
-        const [, day, monthStr, yearStr] = match;
-        const d = parseInt(day);
-        const m = monthNames[monthStr.toLowerCase()];
-        let y = parseInt(yearStr);
-        
-        // Convert 2-digit year to 4-digit year
-        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
-        if (y <= 30) {
-          y += 2000;
-        } else {
-          y += 1900;
-        }
-        
-        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
-          return new Date(Date.UTC(y, m - 1, d));
-        }
-      }
-      return null;
-    },
-
-    // Strategy 8: DD-MMM-YY format (e.g., 24-Dec-24, 09-Jan-26) - 2-digit year
-    () => {
-      const monthNames = {
-        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
-        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
-        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
-        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
-        'may': 5, 'May': 5,
-        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
-        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
-        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
-        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
-        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
-        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
-        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
-      };
-
-
-      const match = str.match(/^(\d{1,2})-([a-zA-Z]+)-(\d{2})$/);
-      if (match) {
-        const [, day, monthStr, yearStr] = match;
-        const d = parseInt(day);
-        const m = monthNames[monthStr.toLowerCase()];
-        let y = parseInt(yearStr);
-        
-        // Convert 2-digit year to 4-digit year
-        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
-        if (y <= 30) {
-          y += 2000;
-        } else {
-          y += 1900;
-        }
-        
-        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
-          return new Date(Date.UTC(y, m - 1, d));
-        }
-      }
-      return null;
-    },
-
-    // Strategy 9: DD/MM/YY format (e.g., 24/12/24, 1/1/26) - 2-digit year
-    () => {
-      const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
-      if (match) {
-        const [, day, month, yearStr] = match;
-        const d = parseInt(day), m = parseInt(month);
-        let y = parseInt(yearStr);
-        
-        // Convert 2-digit year to 4-digit year
-        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
-        if (y <= 30) {
-          y += 2000;
-        } else {
-          y += 1900;
-        }
-        
-        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
-          return new Date(Date.UTC(y, m - 1, d));
-        }
-      }
-      return null;
-    },
-
-    // Strategy 10: DD-MM-YY format (e.g., 24-12-24, 1-1-26) - 2-digit year
-    () => {
-      const match = str.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
-      if (match) {
-        const [, day, month, yearStr] = match;
-        const d = parseInt(day), m = parseInt(month);
-        let y = parseInt(yearStr);
-        
-        // Convert 2-digit year to 4-digit year
-        // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
-        if (y <= 30) {
-          y += 2000;
-        } else {
-          y += 1900;
-        }
-        
-        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
-          return new Date(Date.UTC(y, m - 1, d));
-        }
-      }
-      return null;
-    },
-
-    // Strategy 11: DD MMM YYYY format (e.g., 24 Dec 2024, 1 Jan 2024) - 4-digit year
-    () => {
-      const monthNames = {
-        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
-        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
-        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
-        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
-        'may': 5, 'May': 5,
-        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
-        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
-        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
-        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
-        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
-        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
-        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
-      };
-
-
-      const match = str.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
-      if (match) {
-        const [, day, monthStr, year] = match;
-        const d = parseInt(day), y = parseInt(year);
-        const m = monthNames[monthStr.toLowerCase()];
-        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
-          return new Date(Date.UTC(y, m - 1, d));
-        }
-      }
-      return null;
-    },
-
     // Strategy 12: MMM DD, YYYY format (e.g., Dec 24, 2024)
     () => {
-      const monthNames = {
-        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
-        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
-        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
-        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
-        'may': 5, 'May': 5,
-        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
-        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
-        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
-        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
-        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
-        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
-        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
-      };
-
-
       const match = str.match(/^([a-zA-Z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
       if (match) {
         const [, monthStr, day, year] = match;
         const d = parseInt(day), y = parseInt(year);
-        const m = monthNames[monthStr.toLowerCase()];
-        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
+        const m = MONTH_NAMES[monthStr.toLowerCase()];
+        
+        if (!m) return null;
+        
+        if (d >= 1 && d <= 31 && y >= 1900 && y <= 2100) {
           return new Date(Date.UTC(y, m - 1, d));
         }
       }
@@ -301,45 +257,28 @@ function parseDate(dateStr) {
       return null;
     },
 
-    // Strategy 14: DD-MMM-YYYY format (e.g., 24-Dec-2024) - 4-digit year
+    // Strategy 14: MM/DD/YYYY format (US format)
     () => {
-      const monthNames = {
-        'jan': 1, 'january': 1, 'Jan': 1, 'January': 1,
-        'feb': 2, 'february': 2, 'Feb': 2, 'February': 2,
-        'mar': 3, 'march': 3, 'Mar': 3, 'March': 3,
-        'apr': 4, 'april': 4, 'Apr': 4, 'April': 4,
-        'may': 5, 'May': 5,
-        'jun': 6, 'june': 6, 'Jun': 6, 'June': 6,
-        'jul': 7, 'july': 7, 'Jul': 7, 'July': 7,
-        'aug': 8, 'august': 8, 'Aug': 8, 'August': 8,
-        'sep': 9, 'september': 9, 'Sep': 9, 'September': 9,
-        'oct': 10, 'october': 10, 'Oct': 10, 'October': 10,
-        'nov': 11, 'november': 11, 'Nov': 11, 'November': 11,
-        'dec': 12, 'december': 12, 'Dec': 12, 'December': 12
-      };
-
-      const match = str.match(/^(\d{1,2})-([a-zA-Z]+)-(\d{4})$/);
+      const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if (match) {
-        const [, day, monthStr, year] = match;
-        const d = parseInt(day), y = parseInt(year);
-        const m = monthNames[monthStr.toLowerCase()];
-        if (d >= 1 && d <= 31 && m && y >= 1900 && y <= 2100) {
+        const [, month, day, year] = match;
+        const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100 && d > 12) {
           return new Date(Date.UTC(y, m - 1, d));
         }
       }
       return null;
     },
 
-    // Strategy 15: JavaScript Date.parse() as fallback (handles many formats)
+    // Strategy 15: JavaScript Date.parse() as fallback
     () => {
       try {
         const parsed = new Date(str);
         if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 1900 && parsed.getFullYear() <= 2100) {
-          // Convert to UTC to avoid timezone issues
           return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
         }
       } catch (e) {
-        // Ignore parsing errors
+        // Ignore
       }
       return null;
     }
@@ -353,7 +292,6 @@ function parseDate(dateStr) {
     }
   }
 
-  // If all strategies fail, return null
   return null;
 }
 
@@ -368,7 +306,6 @@ function parseNumber(value, defaultValue = 0) {
     return defaultValue;
   }
   
-  // Remove commas and whitespace
   const cleaned = String(value).replace(/,/g, '').trim();
   const num = parseFloat(cleaned);
   
@@ -392,32 +329,26 @@ function parseBoolean(value) {
 
 /**
  * Transform raw CSV row to normalized format
- * @param {Object} rawRow - Raw CSV row with original column names
- * @param {Array<string>} headers - Original headers
- * @returns {Object} Normalized row
  */
 function transformRow(rawRow, headers) {
   const normalized = {};
 
-  // Map each column to normalized name
   for (const header of headers) {
     const normalizedName = normalizeColumnName(header);
     normalized[normalizedName] = rawRow[header];
   }
 
-  // Parse and validate specific fields
   const close = parseNumber(normalized.close);
   
   return {
     date: parseDate(normalized.date),
     symbol: (normalized.symbol || normalized.ticker || '').toUpperCase().trim(),
-    open: parseNumber(normalized.open) || close,  // Default to close if missing
-    high: parseNumber(normalized.high) || close,  // Default to close if missing
-    low: parseNumber(normalized.low) || close,    // Default to close if missing
+    open: parseNumber(normalized.open) || close,
+    high: parseNumber(normalized.high) || close,
+    low: parseNumber(normalized.low) || close,
     close: close,
     volume: parseNumber(normalized.volume, 0),
     openInterest: parseNumber(normalized.openInterest || normalized.oi, 0),
-    // Preserve any additional fields
     ...Object.fromEntries(
       Object.entries(normalized)
         .filter(([key]) => !['date', 'symbol', 'ticker', 'open', 'high', 'low', 'close', 'volume', 'openInterest', 'oi'].includes(key))
@@ -427,16 +358,9 @@ function transformRow(rawRow, headers) {
 
 /**
  * Transform entire CSV dataset
- * @param {Array<Object>} rawData - Raw CSV data
- * @param {Array<string>} headers - CSV headers
- * @param {Object} options - Transform options
- * @returns {Object} { data, errors, stats }
  */
 function transformDataset(rawData, headers, options = {}) {
-  const {
-    skipInvalid = true,
-    defaultSymbol = null,
-  } = options;
+  const { skipInvalid = true, defaultSymbol = null } = options;
 
   const transformed = [];
   const errors = [];
@@ -446,7 +370,6 @@ function transformDataset(rawData, headers, options = {}) {
     try {
       const row = transformRow(rawData[i], headers);
 
-      // Validate essential fields
       if (!row.date) {
         if (skipInvalid) {
           skipped++;
@@ -455,12 +378,10 @@ function transformDataset(rawData, headers, options = {}) {
         }
       }
 
-      // Apply default symbol if not present
       if (!row.symbol && defaultSymbol) {
         row.symbol = defaultSymbol;
       }
 
-      // Validate close price (required)
       if (!row.close || row.close <= 0) {
         if (skipInvalid) {
           skipped++;
@@ -492,8 +413,6 @@ function transformDataset(rawData, headers, options = {}) {
 
 /**
  * Group transformed data by symbol
- * @param {Array<Object>} data - Transformed data
- * @returns {Map<string, Array>} Map of symbol to data array
  */
 function groupBySymbol(data) {
   const groups = new Map();
@@ -506,7 +425,6 @@ function groupBySymbol(data) {
     groups.get(symbol).push(row);
   }
 
-  // Sort each group by date
   for (const [symbol, rows] of groups) {
     rows.sort((a, b) => a.date - b.date);
   }
@@ -516,15 +434,13 @@ function groupBySymbol(data) {
 
 /**
  * Deduplicate data by date (keep latest)
- * @param {Array<Object>} data - Sorted data array
- * @returns {Array<Object>} Deduplicated data
  */
 function deduplicateByDate(data) {
   const seen = new Map();
 
   for (const row of data) {
     const dateKey = row.date.toISOString().split('T')[0];
-    seen.set(dateKey, row); // Later entries overwrite earlier ones
+    seen.set(dateKey, row);
   }
 
   return Array.from(seen.values()).sort((a, b) => a.date - b.date);
@@ -532,15 +448,9 @@ function deduplicateByDate(data) {
 
 /**
  * Fill missing dates with interpolated values
- * @param {Array<Object>} data - Sorted data array
- * @param {Object} options - Fill options
- * @returns {Array<Object>} Data with filled gaps
  */
 function fillMissingDates(data, options = {}) {
-  const {
-    fillMethod = 'forward', // 'forward', 'backward', 'interpolate'
-    maxGapDays = 5,
-  } = options;
+  const { fillMethod = 'forward', maxGapDays = 5 } = options;
 
   if (data.length < 2) return data;
 
@@ -551,13 +461,11 @@ function fillMissingDates(data, options = {}) {
     const currDate = new Date(data[i].date);
     const diffDays = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
 
-    // Fill gaps (skip weekends - 2 days is normal)
     if (diffDays > 1 && diffDays <= maxGapDays) {
       for (let d = 1; d < diffDays; d++) {
         const fillDate = new Date(prevDate);
         fillDate.setDate(fillDate.getDate() + d);
 
-        // Skip weekends
         if (fillDate.getDay() === 0 || fillDate.getDay() === 6) continue;
 
         let fillRow;
@@ -566,7 +474,6 @@ function fillMissingDates(data, options = {}) {
         } else if (fillMethod === 'backward') {
           fillRow = { ...data[i], date: fillDate };
         } else {
-          // Interpolate
           const ratio = d / diffDays;
           fillRow = {
             date: fillDate,
@@ -592,9 +499,6 @@ function fillMissingDates(data, options = {}) {
 
 /**
  * Convert data to database-ready format
- * @param {Array<Object>} data - Transformed data
- * @param {number} tickerId - Ticker ID for foreign key
- * @returns {Array<Object>} Database-ready records
  */
 function toDatabaseFormat(data, tickerId) {
   return data.map(row => ({
@@ -611,9 +515,6 @@ function toDatabaseFormat(data, tickerId) {
 
 /**
  * Batch data for efficient database insertion
- * @param {Array<Object>} data - Data to batch
- * @param {number} batchSize - Size of each batch
- * @returns {Array<Array>} Array of batches
  */
 function batchData(data, batchSize = 1000) {
   const batches = [];
@@ -625,8 +526,6 @@ function batchData(data, batchSize = 1000) {
 
 /**
  * Format Date object to dd-mm-yyyy string
- * @param {Date} date 
- * @returns {string}
  */
 function formatDateToDDMMYYYY(date) {
   if (!date || !(date instanceof Date) || isNaN(date.getTime())) {

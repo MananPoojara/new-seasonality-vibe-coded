@@ -35,8 +35,32 @@ interface BatchStatus {
   failedFiles: number;
   pendingFiles: number;
   progress: number;
+  currentFile?: string; // Current file being processed with progress info
   files: BatchFile[];
 }
+
+// Helper function to calculate granular progress including current file's progress
+const calculateGranularProgress = (bulkStatus: BatchStatus): number => {
+  if (!bulkStatus || bulkStatus.totalFiles === 0) return 0;
+  
+  // Base progress from completed files
+  const completedFiles = bulkStatus.processedFiles + bulkStatus.failedFiles;
+  const baseProgress = (completedFiles / bulkStatus.totalFiles) * 100;
+  
+  // Try to extract current file's progress from currentFile string (e.g., "filename (45%) - Processing")
+  if (bulkStatus.currentFile && bulkStatus.status === 'PROCESSING') {
+    const match = bulkStatus.currentFile.match(/\((\d+)%\)/);
+    if (match) {
+      const currentFileProgress = parseInt(match[1], 10);
+      // Add the current file's contribution to overall progress
+      const perFileContribution = 100 / bulkStatus.totalFiles;
+      const currentFileContribution = (currentFileProgress / 100) * perFileContribution;
+      return Math.min(baseProgress + currentFileContribution, 100);
+    }
+  }
+  
+  return baseProgress;
+};
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
@@ -659,42 +683,50 @@ export default function AdminPage() {
                       ) : (
                         /* Processing View */
                         <div className="flex flex-col h-full z-20 relative bg-white">
-                           {/* Progress Header */}
-                           <div className="bg-slate-50/50 px-8 py-8 border-b border-slate-100">
-                              <div className="flex items-end justify-between mb-4">
-                                 <div>
-                                    <h4 className="text-slate-500 font-medium text-sm mb-1">Processing Progress</h4>
-                                    <div className="flex items-baseline gap-2">
-                                       <span className="text-4xl font-black text-slate-900 tracking-tight">{bulkStatus.progress.toFixed(0)}%</span>
-                                       <span className="text-sm font-medium text-slate-400">completed</span>
+                           {/* Progress Section */}
+                           <div className="bg-slate-50/50 px-8 py-6 border-b border-slate-100">
+                              {/* Buttons row */}
+                              <div className="flex justify-end gap-2 mb-4">
+                                 {['COMPLETED', 'FAILED', 'PARTIAL'].includes(bulkStatus.status) && (
+                                    <Button size="sm" onClick={resetBulkUpload} variant="outline" className="h-9">
+                                       Upload More
+                                    </Button>
+                                 )}
+                                 {bulkStatus.status === 'PARTIAL' && (
+                                    <Button size="sm" onClick={handleRetry} className="h-9 bg-amber-500 hover:bg-amber-600 text-white">
+                                       <RotateCcw className="h-3.5 w-3.5 mr-2" /> Retry Failed
+                                    </Button>
+                                 )}
+                              </div>
+                              
+                              {/* Progress bar with percentage inside */}
+                              {(() => {
+                                const granularProgress = calculateGranularProgress(bulkStatus);
+                                return (
+                                  <div className="h-8 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner relative">
+                                    <div 
+                                      className={cn(
+                                        "h-full rounded-full transition-all duration-500 ease-out shadow-lg relative overflow-hidden",
+                                        bulkStatus.status === 'FAILED' ? 'bg-rose-500' :
+                                        bulkStatus.status === 'COMPLETED' ? 'bg-emerald-500' :
+                                        'bg-indigo-600'
+                                      )}
+                                      style={{ width: `${granularProgress}%` }} 
+                                    >
+                                      <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent)', backgroundSize: '1rem 1rem' }}></div>
                                     </div>
-                                 </div>
-                                 <div className="flex gap-2">
-                                    {['COMPLETED', 'FAILED', 'PARTIAL'].includes(bulkStatus.status) && (
-                                       <Button size="sm" onClick={resetBulkUpload} variant="outline" className="h-9">
-                                          Upload More
-                                       </Button>
-                                    )}
-                                    {bulkStatus.status === 'PARTIAL' && (
-                                       <Button size="sm" onClick={handleRetry} className="h-9 bg-amber-500 hover:bg-amber-600 text-white">
-                                          <RotateCcw className="h-3.5 w-3.5 mr-2" /> Retry Failed
-                                       </Button>
-                                    )}
-                                 </div>
-                              </div>
-                              <div className="h-4 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                                 <div 
-                                    className={cn(
-                                       "h-full rounded-full transition-all duration-700 ease-out shadow-lg relative overflow-hidden",
-                                       bulkStatus.status === 'FAILED' ? 'bg-rose-500' :
-                                       bulkStatus.status === 'COMPLETED' ? 'bg-emerald-500' :
-                                       'bg-indigo-600'
-                                    )}
-                                    style={{ width: `${bulkStatus.progress}%` }} 
-                                 >
-                                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent)', backgroundSize: '1rem 1rem' }}></div>
-                                 </div>
-                              </div>
+                                    {/* Percentage text centered on progress bar */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className={cn(
+                                        "text-sm font-bold",
+                                        granularProgress > 50 ? "text-white" : "text-slate-700"
+                                      )}>
+                                        {granularProgress.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                               
                               <div className="grid grid-cols-4 gap-4 mt-8">
                                  <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm flex flex-col items-center">
@@ -714,6 +746,16 @@ export default function AdminPage() {
                                     <span className="text-[10px] uppercase font-bold text-indigo-600/70 tracking-wider mt-1">Pending</span>
                                  </div>
                               </div>
+                              
+                              {/* Current file progress */}
+                              {bulkStatus.currentFile && bulkStatus.status === 'PROCESSING' && (
+                                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                  <div className="flex items-center gap-2 text-sm text-blue-700">
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                    <span className="font-medium truncate">{bulkStatus.currentFile}</span>
+                                  </div>
+                                </div>
+                              )}
                            </div>
 
                            {/* File List Table */}

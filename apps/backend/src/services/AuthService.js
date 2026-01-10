@@ -19,7 +19,7 @@ const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
 
 // Token expiry times
-const ACCESS_TOKEN_EXPIRY = '15m';
+const ACCESS_TOKEN_EXPIRY = '1d';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const EMAIL_VERIFICATION_EXPIRY = '24h';
 const PASSWORD_RESET_EXPIRY = '1h';
