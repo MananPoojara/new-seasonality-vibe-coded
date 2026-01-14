@@ -67,7 +67,7 @@ export default function ScenarioPage() {
               <Label>Entry Day</Label>
               <Select value={entryDay} onValueChange={setEntryDay}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   {weekdays.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -76,7 +76,7 @@ export default function ScenarioPage() {
               <Label>Exit Day</Label>
               <Select value={exitDay} onValueChange={setExitDay}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   {weekdays.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -85,7 +85,7 @@ export default function ScenarioPage() {
               <Label>Entry Type</Label>
               <Select value={entryType} onValueChange={(v) => setEntryType(v as 'Open' | 'Close')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="Open">Open</SelectItem>
                   <SelectItem value="Close">Close</SelectItem>
                 </SelectContent>
@@ -95,7 +95,7 @@ export default function ScenarioPage() {
               <Label>Exit Type</Label>
               <Select value={exitType} onValueChange={(v) => setExitType(v as 'Open' | 'Close')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="Open">Open</SelectItem>
                   <SelectItem value="Close">Close</SelectItem>
                 </SelectContent>
@@ -105,7 +105,7 @@ export default function ScenarioPage() {
               <Label>Trade Type</Label>
               <Select value={tradeType} onValueChange={(v) => setTradeType(v as 'Long' | 'Short')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="Long">Long</SelectItem>
                   <SelectItem value="Short">Short</SelectItem>
                 </SelectContent>

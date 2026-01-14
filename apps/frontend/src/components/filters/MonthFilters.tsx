@@ -28,7 +28,7 @@ export function MonthFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Months</SelectItem>
               <SelectItem value="Positive">Positive Months only</SelectItem>
               <SelectItem value="Negative">Negative Months only</SelectItem>
@@ -45,7 +45,7 @@ export function MonthFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Months</SelectItem>
               <SelectItem value="Even">Even Months only</SelectItem>
               <SelectItem value="Odd">Odd Months only</SelectItem>

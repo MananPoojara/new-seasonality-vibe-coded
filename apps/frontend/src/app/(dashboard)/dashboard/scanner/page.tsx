@@ -63,7 +63,7 @@ export default function ScannerPage() {
               <Label>Trend Type</Label>
               <Select value={trendType} onValueChange={(v) => setTrendType(v as 'Bullish' | 'Bearish')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="Bullish">Bullish</SelectItem>
                   <SelectItem value="Bearish">Bearish</SelectItem>
                 </SelectContent>

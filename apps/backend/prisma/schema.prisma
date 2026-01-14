@@ -632,6 +632,25 @@ model UploadedFile {
 }
 
 // =====================================================
+// ELECTION DATA - For year category lookups
+// =====================================================
+
+model ElectionYearCategory {
+  id        Int      @id @default(autoincrement())
+  country   String   // "INDIA", "USA"
+  year      Int      // The year (e.g., 2014, 2019)
+  category  String   // "election", "pre_election", "post_election", "mid_election", "modi", "congress"
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([country, year, category])
+  @@index([country, category])
+  @@index([year])
+  @@index([country, year])
+  @@map("election_year_categories")
+}
+
+// =====================================================
 // SYSTEM MONITORING & AUDIT
 // =====================================================
 

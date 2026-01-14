@@ -33,7 +33,7 @@ export function DayFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Days</SelectItem>
               <SelectItem value="Positive">Positive Days only</SelectItem>
               <SelectItem value="Negative">Negative Days only</SelectItem>
@@ -65,7 +65,7 @@ export function DayFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Days</SelectItem>
               <SelectItem value="Even">Even Days only</SelectItem>
               <SelectItem value="Odd">Odd Days only</SelectItem>
@@ -82,7 +82,7 @@ export function DayFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Days</SelectItem>
               <SelectItem value="Even">Even Days only</SelectItem>
               <SelectItem value="Odd">Odd Days only</SelectItem>

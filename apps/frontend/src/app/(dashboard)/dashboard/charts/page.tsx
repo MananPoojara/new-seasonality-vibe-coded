@@ -59,7 +59,7 @@ export default function ChartsPage() {
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white">
                 <SelectItem value="line">Line Chart</SelectItem>
                 <SelectItem value="bar">Bar Chart</SelectItem>
                 <SelectItem value="candlestick">Candlestick</SelectItem>

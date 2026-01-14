@@ -74,7 +74,7 @@ export default function BasketPage() {
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Select symbol to add" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white">
                 {symbols
                   .filter((s: any) => !basketSymbols.includes(s.symbol))
                   .map((s: any) => (

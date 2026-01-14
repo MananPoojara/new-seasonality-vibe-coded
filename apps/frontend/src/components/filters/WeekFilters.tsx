@@ -25,7 +25,7 @@ export function WeekFilters({ weekType = 'expiry' }: { weekType?: 'expiry' | 'mo
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Weeks</SelectItem>
               <SelectItem value="Positive">Positive Weeks only</SelectItem>
               <SelectItem value="Negative">Negative Weeks only</SelectItem>
@@ -42,7 +42,7 @@ export function WeekFilters({ weekType = 'expiry' }: { weekType?: 'expiry' | 'mo
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Weeks</SelectItem>
               <SelectItem value="Even">Even Weeks only</SelectItem>
               <SelectItem value="Odd">Odd Weeks only</SelectItem>
@@ -70,7 +70,7 @@ export function WeekFilters({ weekType = 'expiry' }: { weekType?: 'expiry' | 'mo
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Weeks</SelectItem>
               <SelectItem value="Even">Even Weeks only</SelectItem>
               <SelectItem value="Odd">Odd Weeks only</SelectItem>

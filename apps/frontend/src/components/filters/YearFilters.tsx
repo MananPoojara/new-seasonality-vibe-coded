@@ -19,6 +19,7 @@ export function YearFilters() {
   };
 
   return (
+    <>
     <div className="filter-section">
       <h3 className="text-lg font-semibold text-primary mb-4">Yearly Filters</h3>
       
@@ -32,7 +33,7 @@ export function YearFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Years</SelectItem>
               <SelectItem value="Positive">Positive Years only</SelectItem>
               <SelectItem value="Negative">Negative Years only</SelectItem>
@@ -49,7 +50,7 @@ export function YearFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Years</SelectItem>
               <SelectItem value="Even">Even Years only</SelectItem>
               <SelectItem value="Odd">Odd Years only</SelectItem>
@@ -75,5 +76,6 @@ export function YearFilters() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -165,7 +165,8 @@ export default api;
 
 // Types
 export interface DailyAnalysisParams {
-  symbols: string[];
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
   startDate: string;
   endDate: string;
   lastNDays?: number;
@@ -175,11 +176,25 @@ export interface DailyAnalysisParams {
   aggregateField?: string;
 }
 
-export interface WeeklyAnalysisParams extends DailyAnalysisParams {
+export interface WeeklyAnalysisParams {
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
+  startDate: string;
+  endDate: string;
   weekType: 'monday' | 'expiry';
+  lastNDays?: number;
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
 }
 
-export interface MonthlyAnalysisParams extends DailyAnalysisParams {
+export interface MonthlyAnalysisParams {
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
+  startDate: string;
+  endDate: string;
+  lastNDays?: number;
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
   aggregateType?: 'total' | 'average';
 }
 

@@ -16,7 +16,7 @@ router.get('/health', async (req, res) => {
   try {
     // Test database connection
     await require('../utils/prisma').$queryRaw`SELECT 1`;
-    
+
     res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),

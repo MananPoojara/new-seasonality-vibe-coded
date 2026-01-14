@@ -30,7 +30,7 @@ export function SymbolSelector() {
         <SelectTrigger>
           <SelectValue placeholder="Select symbol" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-white">
           {symbols.map((symbol: { symbol: string; name: string }) => (
             <SelectItem key={symbol.symbol} value={symbol.symbol}>
               {symbol.symbol} {symbol.name && `- ${symbol.name}`}
