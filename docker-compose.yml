@@ -3,7 +3,7 @@
 version: '3.9'
 
 services:
-  # PostgreSQL with TimescaleDB for time-series data
+  # PostgreSQL with TimescaleDB for time-series data (OPTIMIZED)
   postgres:
     image: timescale/timescaledb:2.15.1-pg16
     container_name: seasonality-postgres
@@ -11,11 +11,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-seasonality}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seasonality123}
       POSTGRES_DB: ${POSTGRES_DB:-seasonality}
-      # Performance tuning for desktop environment
-      POSTGRES_SHARED_BUFFERS: 512MB
+      # Performance tuning for server environment
+      POSTGRES_SHARED_BUFFERS: 256MB
       POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
-      POSTGRES_WORK_MEM: 16MB
+      POSTGRES_WORK_MEM: 4MB
       POSTGRES_MAINTENANCE_WORK_MEM: 128MB
+      POSTGRES_MAX_CONNECTIONS: 200
+      POSTGRES_WORKER_PROCESSES: 4
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
@@ -25,11 +27,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
-          cpus: '1.0'
+          memory: 3G
+          cpus: '2.0'
         reservations:
-          memory: 1G
-          cpus: '0.5'
+          memory: 1.5G
+          cpus: '1.0'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seasonality} -d ${POSTGRES_DB:-seasonality}"]
       interval: 30s
@@ -98,7 +100,7 @@ services:
     networks:
       - seasonality-net
 
-  # Backend API service
+  # Backend API service (OPTIMIZED with more resources)
   backend:
     build:
       context: ./apps/backend
@@ -110,13 +112,13 @@ services:
       - "${API_PORT:-3001}:3001"
     environment:
       # Database
-      DATABASE_URL: postgresql://${POSTGRES_USER:-seasonality}:${POSTGRES_PASSWORD:-seasonality123}@postgres:5432/${POSTGRES_DB:-seasonality}
-      
+      DATABASE_URL: postgresql://${POSTGRES_USER:-seasonality}:${POSTGRES_PASSWORD:-seasonality123}@postgres:5432/${POSTGRES_DB:-seasonality}?connection_limit=20&pool_timeout=10
+
       # Redis
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      
+
       # MinIO - dual endpoint config
       MINIO_INTERNAL_ENDPOINT: minio        # Docker network access
       MINIO_ENDPOINT: 192.168.4.30             # Browser / frontend access
@@ -125,17 +127,18 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-admin12345}
       MINIO_USE_SSL: "false"
       MINIO_BUCKET: seasonality-uploads
-      
+
       # Application
       NODE_ENV: ${NODE_ENV:-production}
+      NODE_OPTIONS: --max-old-space-size=2048
       JWT_SECRET: ${JWT_SECRET:-your-super-secure-jwt-secret}
-      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-10}
       CORS_ORIGIN: "*"
-      
+
       # Performance
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
-      
+
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
@@ -151,11 +154,11 @@ services:
     deploy:
       resources:
         limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
           memory: 1G
           cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
       interval: 30s
@@ -233,6 +236,7 @@ services:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
       NODE_ENV: ${NODE_ENV:-production}
+      NODE_OPTIONS: --max-old-space-size=1536
       NEXT_PUBLIC_API_URL: http://192.168.4.30:${API_PORT:-3001}
       NEXT_PUBLIC_MINIO_ENDPOINT: http://192.168.4.30:9000
     volumes:
@@ -245,11 +249,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 2G
+          cpus: '1.0'
         reservations:
-          memory: 256M
-          cpus: '0.25'
+          memory: 1G
+          cpus: '0.5'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s

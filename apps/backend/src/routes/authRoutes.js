@@ -36,17 +36,53 @@ const updateProfileSchema = z.object({
 // =====================================================
 
 /**
+ * GET /auth/test
+ * Test auth endpoint
+ */
+router.get('/test', async (req, res) => {
+  try {
+    // Test database connection
+    const testQuery = await require('../utils/prisma').$queryRaw`SELECT 1 as test`;
+    
+    res.json({
+      success: true,
+      message: 'Auth service is working',
+      database: 'connected',
+      testQuery,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Auth service error',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
  * POST /auth/register
  * Register a new user
  */
 router.post('/register', validate(registerSchema), async (req, res, next) => {
   try {
+    console.log('Registration request received:', {
+      body: { ...req.body, password: '***' },
+      headers: req.headers,
+      ip: req.ip
+    });
+    
     const result = await AuthService.register(req.body);
+    
+    console.log('Registration successful, sending response');
+    
     res.status(201).json({
       success: true,
       ...result,
     });
   } catch (error) {
+    console.error('Registration error in route:', error);
     next(error);
   }
 });
@@ -57,16 +93,26 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
  */
 router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
+    console.log('Login request received:', {
+      body: { ...req.body, password: '***' },
+      headers: req.headers,
+      ip: req.ip
+    });
+    
     const { email, password } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'];
 
     const result = await AuthService.login(email, password, ipAddress, userAgent);
+    
+    console.log('Login successful, sending response');
+    
     res.json({
       success: true,
       ...result,
     });
   } catch (error) {
+    console.error('Login error in route:', error);
     next(error);
   }
 });

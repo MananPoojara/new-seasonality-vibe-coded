@@ -4,10 +4,16 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 const API_BASE_URL = baseUrl.startsWith('http') ? `${baseUrl}/api` : '/api';
 
+console.log('API Configuration:', {
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  baseUrl,
+  API_BASE_URL
+});
+
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 300000, // 5 minutes for large uploads
+  timeout: 30000, // Reduced to 30 seconds for auth requests
   headers: {
     'Content-Type': 'application/json',
   },
@@ -16,6 +22,14 @@ const api: AxiosInstance = axios.create({
 // Request interceptor - add auth token
 api.interceptors.request.use(
   (config) => {
+    console.log('Making API request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      timeout: config.timeout
+    });
+    
     const token = typeof window !== 'undefined' 
       ? localStorage.getItem('accessToken') 
       : null;
@@ -24,16 +38,37 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor - handle errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API response received:', {
+      status: response.status,
+      url: response.config.url,
+      data: response.data
+    });
+    return response;
+  },
   async (error: AxiosError) => {
+    console.error('API response error:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+      code: error.code
+    });
+    
     if (error.response?.status === 401) {
-      // Token expired - try refresh or redirect to login
-      if (typeof window !== 'undefined') {
+      // Don't auto-redirect for /auth/me - let checkAuth handle it
+      const isAuthMeRequest = error.config?.url?.includes('/auth/me');
+      
+      if (!isAuthMeRequest && typeof window !== 'undefined') {
+        // Token expired - redirect to login for other requests
         localStorage.removeItem('accessToken');
         window.location.href = '/login';
       }
@@ -44,10 +79,16 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
-  register: (data: { email: string; password: string; name: string }) =>
-    api.post('/auth/register', data),
+  login: (email: string, password: string) => {
+    console.log('authApi.login called with:', { email, password: '***' });
+    console.log('Making request to:', `${API_BASE_URL}/auth/login`);
+    return api.post('/auth/login', { email, password }, { timeout: 15000 });
+  },
+  register: (data: { email: string; password: string; name: string }) => {
+    console.log('authApi.register called with:', { ...data, password: '***' });
+    console.log('Making request to:', `${API_BASE_URL}/auth/register`);
+    return api.post('/auth/register', data, { timeout: 15000 });
+  },
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   refreshToken: (refreshToken: string) =>

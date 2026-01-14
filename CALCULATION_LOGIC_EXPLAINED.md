@@ -1,5 +1,224 @@
 # 📊 Calculation Logic Explained - Like You're 10 Years Old!
 
+---
+
+## 🚨 IMPORTANT: Data Comparison Between Old & New Software
+
+### What You Observed:
+
+| Date | Field | Old Software (1_Daily.csv) | New Software (Database) |
+|------|-------|---------------------------|------------------------|
+| 25/09/1992 | MondayWeeklyReturnPoints | `-22.92` ✅ | `--` (blank) ❌ |
+| 25/09/1992 | MondayWeeklyReturnPercentage | `-2.39%` ✅ | `--` (blank) ❌ |
+
+### The Issue:
+
+The **old software CSV files HAVE the values**, but the **new software database shows blanks** for the same fields.
+
+This means the data was either:
+1. **Not migrated correctly** from old CSV to new database, OR
+2. **Not calculated correctly** when the fileGenerator.js ran
+
+### Where the Values Come From:
+
+**Old Software (Python):**
+```python
+# In GenerateMultipleFiles.py
+mondayWeeklyData = np.array(symbolDailyData.apply(lambda row: getMondayWeeklyData(row), axis=1).tolist()).transpose()
+symbolDailyData['MondayWeeklyReturnPoints'] = mondayWeeklyData[0]
+symbolDailyData['MondayWeeklyReturnPercentage'] = mondayWeeklyData[1]
+```
+
+**New Software (JavaScript):**
+```javascript
+// In fileGenerator.js
+const mondayWeeklyData = this.getMondayWeeklyData(record);
+record.mondayWeeklyReturnPoints = mondayWeeklyData.returnPoints;
+record.mondayWeeklyReturnPercentage = mondayWeeklyData.returnPercentage;
+```
+
+### Possible Causes for Blank Values:
+
+1. **Timezone mismatch** - Date comparison failing due to UTC vs local time
+2. **Data not found** - Weekly record lookup returning null
+3. **Migration issue** - Values not copied during data import
+
+---
+
+## 🚨 WHY SOME FIELDS ARE BLANK IN OLD SOFTWARE (But Filled in New Software)
+
+### The Problem You Asked About:
+
+In the old software's `1_Daily.csv`, you see fields like:
+- `MondayWeeklyReturnPoints` → **BLANK**
+- `MondayWeeklyReturnPercentage` → **BLANK**
+- `MondayWeekNumberMonthly` → **BLANK**
+- `MondayWeekNumberYearly` → **BLANK**
+
+### Why Are They Blank?
+
+**Simple Answer:** You can't calculate "how much did it change" if there's nothing to compare it to!
+
+### Real Example from NIFTY (Old Software):
+
+```csv
+Date        | MondayWeeklyDate | MondayWeekNumberMonthly | MondayWeeklyReturnPoints
+------------|------------------|-------------------------|-------------------------
+1992-01-13  | 1992-01-13       | BLANK                   | BLANK          ← First week ever!
+1992-01-14  | 1992-01-13       | BLANK                   | BLANK          ← Same week
+1992-01-15  | 1992-01-13       | BLANK                   | BLANK          ← Same week
+1992-01-20  | 1992-01-20       | BLANK                   | 15.07          ← NOW we have previous week!
+1992-01-21  | 1992-01-20       | BLANK                   | 15.07          ← Same week
+```
+
+### Think of it Like This (For a 10-Year-Old):
+
+Imagine you're tracking your height every week:
+- **Week 1:** You're 120 cm tall. How much did you grow? **You don't know!** (No previous week to compare)
+- **Week 2:** You're 122 cm tall. How much did you grow? **2 cm!** (122 - 120 = 2)
+
+The same thing happens with stock prices:
+- **First week:** NIFTY closed at 617.27. Weekly return? **Can't calculate!** (No previous week)
+- **Second week:** NIFTY closed at 632.34. Weekly return? **15.07 points!** (632.34 - 617.27)
+
+### The Python Code That Creates Blanks:
+
+```python
+# Week numbers start from row 1 (not row 0)
+for i in range(1, len(symbolMondayWeeklyData)):  # ← Starts from 1, skips first row!
+    if (symbolMondayWeeklyData.loc[i, 'Date'].month != symbolMondayWeeklyData.loc[i-1, 'Date'].month):
+        symbolMondayWeeklyData.loc[i, 'WeekNumberMonthly'] = 1
+    else:
+        symbolMondayWeeklyData.loc[i, 'WeekNumberMonthly'] = symbolMondayWeeklyData.loc[i-1, 'WeekNumberMonthly'] + 1
+
+# Return calculation uses shift(1) which makes first row NaN
+symbolMondayWeeklyData['ReturnPoints'] = symbolMondayWeeklyData['Close'] - symbolMondayWeeklyData['Close'].shift(1)
+#                                                                          ↑ shift(1) = previous row, but first row has no previous!
+```
+
+### The JavaScript Code (New Software) - Same Logic:
+
+```javascript
+// In calculateMondayWeeklyFields()
+for (let i = 0; i < this.symbolMondayWeeklyData.length; i++) {
+    if (i === 0) {
+        record.weekNumberMonthly = null;  // ← First row is NULL
+        record.weekNumberYearly = null;   // ← First row is NULL
+    } else {
+        // Calculate from previous row
+    }
+    
+    if (i > 0) {
+        record.returnPoints = record.close - prevRecord.close;  // ← Needs previous row
+    } else {
+        record.returnPoints = null;  // ← First row is NULL
+    }
+}
+```
+
+### Summary Table - Why Fields Are Blank:
+
+| Field | Why Blank for First Week? |
+|-------|--------------------------|
+| `MondayWeekNumberMonthly` | Loop starts from row 1, row 0 stays blank |
+| `MondayWeekNumberYearly` | Loop starts from row 1, row 0 stays blank |
+| `MondayWeeklyReturnPoints` | Needs previous week's close to calculate |
+| `MondayWeeklyReturnPercentage` | Needs previous week's close to calculate |
+| `ExpiryWeekNumberMonthly` | Same reason - first expiry week has no previous |
+| `ExpiryWeeklyReturnPoints` | Same reason - needs previous expiry week |
+
+### When Do Values Start Appearing?
+
+| Timeframe | First Value Appears |
+|-----------|---------------------|
+| Daily Return | 2nd trading day |
+| Weekly Return | 2nd week |
+| Monthly Return | 2nd month |
+| Yearly Return | 2nd year |
+| Week Number Monthly | 2nd week of data |
+| Week Number Yearly | 2nd week of data |
+
+---
+
+## 📐 HOW MONDAY WEEKLY RETURN IS CALCULATED (Step by Step)
+
+### Step 1: Create Weekly Data from Daily Data
+
+**Daily Data (Input):**
+```
+Date        | Close
+------------|--------
+1992-01-13  | 590.46  (Monday)
+1992-01-14  | 591.86  (Tuesday)
+1992-01-15  | 596.63  (Wednesday)
+1992-01-16  | 591.40  (Thursday)
+1992-01-17  | 617.27  (Friday)    ← Week 1 ends here
+1992-01-20  | 617.65  (Monday)    ← Week 2 starts
+1992-01-21  | 624.04  (Tuesday)
+...
+1992-01-24  | 632.34  (Friday)    ← Week 2 ends here
+```
+
+**Weekly Data (Generated):**
+```
+MondayDate  | Open   | High   | Low    | Close  | How Aggregated
+------------|--------|--------|--------|--------|----------------
+1992-01-13  | 590.46 | 617.27 | 590.46 | 617.27 | First open, Max high, Min low, Last close
+1992-01-20  | 617.65 | 635.61 | 617.65 | 632.34 | First open, Max high, Min low, Last close
+```
+
+### Step 2: Calculate Weekly Returns
+
+```
+Week 1 Close: 617.27
+Week 2 Close: 632.34
+
+Week 2 Return Points = 632.34 - 617.27 = 15.07
+Week 2 Return % = (15.07 / 617.27) × 100 = 2.44%
+```
+
+### Step 3: Link Back to Daily Data
+
+Now every daily record in Week 2 gets the same weekly return:
+
+```
+Date        | MondayWeeklyDate | MondayWeeklyReturnPoints | MondayWeeklyReturnPercentage
+------------|------------------|--------------------------|-----------------------------
+1992-01-20  | 1992-01-20       | 15.07                    | 2.44
+1992-01-21  | 1992-01-20       | 15.07                    | 2.44
+1992-01-22  | 1992-01-20       | 15.07                    | 2.44
+1992-01-23  | 1992-01-20       | 15.07                    | 2.44
+1992-01-24  | 1992-01-20       | 15.07                    | 2.44
+```
+
+### Visual Flow:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        DAILY DATA                                │
+│  Mon  Tue  Wed  Thu  Fri  │  Mon  Tue  Wed  Thu  Fri            │
+│  590  591  596  591  617  │  617  624  631  635  632            │
+│  └────────────────────────┘  └────────────────────────────────┘ │
+│           WEEK 1                        WEEK 2                   │
+└─────────────────────────────────────────────────────────────────┘
+                    │                         │
+                    ▼                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       WEEKLY DATA                                │
+│  Week 1: Close = 617.27    │    Week 2: Close = 632.34          │
+│  Return = NULL (no prev)   │    Return = 632.34 - 617.27 = 15.07│
+└─────────────────────────────────────────────────────────────────┘
+                    │                         │
+                    ▼                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 DAILY DATA (WITH WEEKLY FIELDS)                  │
+│  Week 1 days: MondayWeeklyReturnPoints = NULL                   │
+│  Week 2 days: MondayWeeklyReturnPoints = 15.07 (all 5 days!)    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 🎯 What Are We Doing?
 
 Imagine you have a diary where you write down the price of your favorite toy (NIFTY) every day. Now you want to:

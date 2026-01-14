@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Mail, Sparkles } from "lucide-react";
 import toast from 'react-hot-toast';
+import { LoadingOverlay } from '@/components/ui/loading';
 
 interface PupilProps {
   size?: number;
@@ -186,6 +187,7 @@ export default function LoginPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false);
   const [isPurplePeeking, setIsPurplePeeking] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const purpleRef = useRef<HTMLDivElement>(null);
   const blackRef = useRef<HTMLDivElement>(null);
   const yellowRef = useRef<HTMLDivElement>(null);
@@ -301,26 +303,55 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('Login form submitted with:', { email, password: '***' });
+    console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
+    
     try {
+      console.log('Calling login function...');
       await login(email, password);
+      console.log('Login function completed successfully');
       toast.success('Login successful!');
       
       // Get user from store after login
       const { user } = useAuthStore.getState();
+      console.log('User after login:', user);
       
       // Redirect admin users to admin panel, others to dashboard
+      setIsRedirecting(true); // Start redirect loading
       if (user?.role === 'admin') {
+        console.log('Redirecting to admin panel');
         router.push('/admin');
       } else {
+        console.log('Redirecting to dashboard');
         router.push('/dashboard/daily');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      setIsRedirecting(false); // Stop redirect loading on error
+      console.error('Login error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config
+      });
+      
+      const message = error.response?.data?.error?.message || 
+                     error.response?.data?.message || 
+                     error.response?.data?.error || 
+                     error.message ||
+                     'Login failed';
+      toast.error(message);
     }
   };
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
+      {/* Loading Overlay */}
+      <LoadingOverlay 
+        isVisible={isLoading || isRedirecting} 
+        text={isRedirecting ? "Redirecting..." : "Signing in..."} 
+      />
+      
       {/* Left Content Section */}
       <div className="relative hidden lg:flex flex-col justify-between bg-purple-800 to-primary/80 p-12 text-primary-foreground">
         <div className="relative z-20">
@@ -604,9 +635,9 @@ export default function LoginPage() {
               type="submit"
               className="w-full h-12 text-base font-medium bg-purple-800 hover:bg-purple-600"
               size="lg"
-              disabled={isLoading}
+              disabled={isLoading || isRedirecting}
             >
-              {isLoading ? "Signing in..." : "Log in"}
+              {isLoading || isRedirecting ? "Signing in..." : "Log in"}
             </Button>
           </form>
 

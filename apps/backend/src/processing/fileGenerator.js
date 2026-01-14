@@ -351,36 +351,48 @@ class FileGenerator {
 
   /**
    * Calculate Monday weekly derived fields
+   * Matches Python logic from GenerateMultipleFiles.py
    */
   calculateMondayWeeklyFields() {
-    // Calculate week numbers
+    // Calculate week numbers - matches Python: for i in range(1, len(symbolMondayWeeklyData))
     for (let i = 0; i < this.symbolMondayWeeklyData.length; i++) {
       const record = this.symbolMondayWeeklyData[i];
       
       if (i === 0) {
+        // First row always has null week numbers (matches Python)
         record.weekNumberMonthly = null;
         record.weekNumberYearly = null;
       } else {
         const prevRecord = this.symbolMondayWeeklyData[i - 1];
         
-        // Monthly week number
+        // Monthly week number - only set if month changed OR previous had a value
         if (record.date.getMonth() !== prevRecord.date.getMonth()) {
+          // Month changed - start at 1
           record.weekNumberMonthly = 1;
+        } else if (prevRecord.weekNumberMonthly !== null) {
+          // Same month and previous had value - increment
+          record.weekNumberMonthly = prevRecord.weekNumberMonthly + 1;
         } else {
-          record.weekNumberMonthly = (prevRecord.weekNumberMonthly || 0) + 1;
+          // Same month but previous was null - stay null
+          record.weekNumberMonthly = null;
         }
         
-        // Yearly week number
+        // Yearly week number - only set if year changed OR previous had a value
         if (record.date.getFullYear() !== prevRecord.date.getFullYear()) {
+          // Year changed - start at 1
           record.weekNumberYearly = 1;
+        } else if (prevRecord.weekNumberYearly !== null) {
+          // Same year and previous had value - increment
+          record.weekNumberYearly = prevRecord.weekNumberYearly + 1;
         } else {
-          record.weekNumberYearly = (prevRecord.weekNumberYearly || 0) + 1;
+          // Same year but previous was null - stay null
+          record.weekNumberYearly = null;
         }
       }
       
       // Even week numbers
-      record.evenWeekNumberMonthly = record.weekNumberMonthly ? (record.weekNumberMonthly % 2) === 0 : null;
-      record.evenWeekNumberYearly = record.weekNumberYearly ? (record.weekNumberYearly % 2) === 0 : null;
+      record.evenWeekNumberMonthly = record.weekNumberMonthly !== null ? (record.weekNumberMonthly % 2) === 0 : null;
+      record.evenWeekNumberYearly = record.weekNumberYearly !== null ? (record.weekNumberYearly % 2) === 0 : null;
       
       // Return calculations
       if (i > 0) {
@@ -412,36 +424,53 @@ class FileGenerator {
 
   /**
    * Calculate Expiry weekly derived fields
+   * Matches Python logic from GenerateMultipleFiles.py
    */
   calculateExpiryWeeklyFields() {
-    // Calculate week numbers
+    // Calculate week numbers - matches Python: for i in range(1, len(symbolExpiryWeeklyData))
     for (let i = 0; i < this.symbolExpiryWeeklyData.length; i++) {
       const record = this.symbolExpiryWeeklyData[i];
       
+      // Ensure startDate is set (Date - 6 days) - matches Python: symbolExpiryWeeklyData['StartDate'] = symbolExpiryWeeklyData['Date'] - pd.Timedelta(days=6)
+      if (!record.startDate) {
+        record.startDate = new Date(record.date.getTime() - 6 * 24 * 60 * 60 * 1000);
+      }
+      
       if (i === 0) {
+        // First row always has null week numbers (matches Python)
         record.weekNumberMonthly = null;
         record.weekNumberYearly = null;
       } else {
         const prevRecord = this.symbolExpiryWeeklyData[i - 1];
         
-        // Monthly week number
+        // Monthly week number - only set if month changed OR previous had a value
         if (record.date.getMonth() !== prevRecord.date.getMonth()) {
+          // Month changed - start at 1
           record.weekNumberMonthly = 1;
+        } else if (prevRecord.weekNumberMonthly !== null) {
+          // Same month and previous had value - increment
+          record.weekNumberMonthly = prevRecord.weekNumberMonthly + 1;
         } else {
-          record.weekNumberMonthly = (prevRecord.weekNumberMonthly || 0) + 1;
+          // Same month but previous was null - stay null
+          record.weekNumberMonthly = null;
         }
         
-        // Yearly week number
+        // Yearly week number - only set if year changed OR previous had a value
         if (record.date.getFullYear() !== prevRecord.date.getFullYear()) {
+          // Year changed - start at 1
           record.weekNumberYearly = 1;
+        } else if (prevRecord.weekNumberYearly !== null) {
+          // Same year and previous had value - increment
+          record.weekNumberYearly = prevRecord.weekNumberYearly + 1;
         } else {
-          record.weekNumberYearly = (prevRecord.weekNumberYearly || 0) + 1;
+          // Same year but previous was null - stay null
+          record.weekNumberYearly = null;
         }
       }
       
       // Even week numbers
-      record.evenWeekNumberMonthly = record.weekNumberMonthly ? (record.weekNumberMonthly % 2) === 0 : null;
-      record.evenWeekNumberYearly = record.weekNumberYearly ? (record.weekNumberYearly % 2) === 0 : null;
+      record.evenWeekNumberMonthly = record.weekNumberMonthly !== null ? (record.weekNumberMonthly % 2) === 0 : null;
+      record.evenWeekNumberYearly = record.weekNumberYearly !== null ? (record.weekNumberYearly % 2) === 0 : null;
       
       // Return calculations
       if (i > 0) {
@@ -473,6 +502,7 @@ class FileGenerator {
 
   /**
    * Calculate daily derived fields
+   * Matches Python logic from GenerateMultipleFiles.py
    */
   calculateDailyFields() {
     for (let i = 0; i < this.symbolDailyData.length; i++) {
@@ -482,33 +512,44 @@ class FileGenerator {
       record.calendarMonthDay = record.date.getDate();
       record.calendarYearDay = this.getDayOfYear(record.date);
       
-      // Trading day fields
+      // Trading day fields - matches Python: for i in range(1, len(symbolDailyData))
       if (i === 0) {
+        // First row always has null trading days (matches Python)
         record.tradingMonthDay = null;
         record.tradingYearDay = null;
       } else {
         const prevRecord = this.symbolDailyData[i - 1];
         
-        // Trading month day
+        // Trading month day - only set if month changed OR previous had a value
         if (record.date.getMonth() !== prevRecord.date.getMonth()) {
+          // Month changed - start at 1
           record.tradingMonthDay = 1;
+        } else if (prevRecord.tradingMonthDay !== null) {
+          // Same month and previous had value - increment
+          record.tradingMonthDay = prevRecord.tradingMonthDay + 1;
         } else {
-          record.tradingMonthDay = (prevRecord.tradingMonthDay || 0) + 1;
+          // Same month but previous was null - stay null
+          record.tradingMonthDay = null;
         }
         
-        // Trading year day
+        // Trading year day - only set if year changed OR previous had a value
         if (record.date.getFullYear() !== prevRecord.date.getFullYear()) {
+          // Year changed - start at 1
           record.tradingYearDay = 1;
+        } else if (prevRecord.tradingYearDay !== null) {
+          // Same year and previous had value - increment
+          record.tradingYearDay = prevRecord.tradingYearDay + 1;
         } else {
-          record.tradingYearDay = (prevRecord.tradingYearDay || 0) + 1;
+          // Same year but previous was null - stay null
+          record.tradingYearDay = null;
         }
       }
       
       // Even day fields
       record.evenCalendarMonthDay = (record.calendarMonthDay % 2) === 0;
       record.evenCalendarYearDay = (record.calendarYearDay % 2) === 0;
-      record.evenTradingMonthDay = record.tradingMonthDay ? (record.tradingMonthDay % 2) === 0 : null;
-      record.evenTradingYearDay = record.tradingYearDay ? (record.tradingYearDay % 2) === 0 : null;
+      record.evenTradingMonthDay = record.tradingMonthDay !== null ? (record.tradingMonthDay % 2) === 0 : null;
+      record.evenTradingYearDay = record.tradingYearDay !== null ? (record.tradingYearDay % 2) === 0 : null;
       
       // Return calculations
       if (i > 0) {
@@ -527,8 +568,8 @@ class FileGenerator {
       const mondayWeeklyData = this.getMondayWeeklyData(record);
       record.mondayWeekNumberMonthly = mondayWeeklyData.weekNumberMonthly;
       record.mondayWeekNumberYearly = mondayWeeklyData.weekNumberYearly;
-      record.evenMondayWeekNumberMonthly = mondayWeeklyData.weekNumberMonthly ? (mondayWeeklyData.weekNumberMonthly % 2) === 0 : null;
-      record.evenMondayWeekNumberYearly = mondayWeeklyData.weekNumberYearly ? (mondayWeeklyData.weekNumberYearly % 2) === 0 : null;
+      record.evenMondayWeekNumberMonthly = mondayWeeklyData.weekNumberMonthly !== null ? (mondayWeeklyData.weekNumberMonthly % 2) === 0 : null;
+      record.evenMondayWeekNumberYearly = mondayWeeklyData.weekNumberYearly !== null ? (mondayWeeklyData.weekNumberYearly % 2) === 0 : null;
       record.mondayWeeklyReturnPoints = mondayWeeklyData.returnPoints;
       record.mondayWeeklyReturnPercentage = mondayWeeklyData.returnPercentage;
       record.positiveMondayWeek = mondayWeeklyData.returnPoints > 0;
@@ -538,8 +579,8 @@ class FileGenerator {
       const expiryWeeklyData = this.getExpiryWeeklyData(record);
       record.expiryWeekNumberMonthly = expiryWeeklyData.weekNumberMonthly;
       record.expiryWeekNumberYearly = expiryWeeklyData.weekNumberYearly;
-      record.evenExpiryWeekNumberMonthly = expiryWeeklyData.weekNumberMonthly ? (expiryWeeklyData.weekNumberMonthly % 2) === 0 : null;
-      record.evenExpiryWeekNumberYearly = expiryWeeklyData.weekNumberYearly ? (expiryWeeklyData.weekNumberYearly % 2) === 0 : null;
+      record.evenExpiryWeekNumberMonthly = expiryWeeklyData.weekNumberMonthly !== null ? (expiryWeeklyData.weekNumberMonthly % 2) === 0 : null;
+      record.evenExpiryWeekNumberYearly = expiryWeeklyData.weekNumberYearly !== null ? (expiryWeeklyData.weekNumberYearly % 2) === 0 : null;
       record.expiryWeeklyReturnPoints = expiryWeeklyData.returnPoints;
       record.expiryWeeklyReturnPercentage = expiryWeeklyData.returnPercentage;
       record.positiveExpiryWeek = expiryWeeklyData.returnPoints > 0;

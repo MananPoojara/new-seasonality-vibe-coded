@@ -7,7 +7,6 @@ import { uploadApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import {Button}  from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loading } from '@/components/ui/loading';
 import { 
   Upload, FileText, RefreshCw, Play, CheckCircle, XCircle, 
   Clock, Cloud, Trash2, RotateCcw, Database, FileSpreadsheet, LogOut, Settings,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { Loading, PageLoader } from '@/components/ui/loading';
 import { CalculatedDataSection } from '@/components/admin/GeneratedFilesSection';
 import { ErrorPopover } from '@/components/ui/ErrorPopover';
 
@@ -65,19 +65,43 @@ const calculateGranularProgress = (bulkStatus: BatchStatus): number => {
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { user, logout, isAuthenticated, checkAuth, _hasHydrated } = useAuthStore();
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   
-  // Check if user is admin
+  // Wait for store hydration and check auth
   useEffect(() => {
+    if (!_hasHydrated) {
+      console.log('Admin page: Waiting for store to hydrate...');
+      return;
+    }
+
+    const checkAndLoad = async () => {
+      console.log('Admin page: Store hydrated, checking auth...');
+      setIsAuthChecking(true);
+      await checkAuth();
+      setIsAuthChecking(false);
+      setHasCheckedAuth(true);
+    };
+    
+    checkAndLoad();
+  }, [checkAuth, _hasHydrated]);
+  
+  // Check if user is admin (only after auth check is complete)
+  useEffect(() => {
+    if (!hasCheckedAuth) return;
+    
     if (!isAuthenticated) {
+      console.log('Admin page: Not authenticated, redirecting to login');
       router.push('/login');
       return;
     }
     if (user?.role !== 'admin') {
+      console.log('Admin page: Not admin, redirecting to home');
       router.push('/');
       toast.error('Access denied. Admin only.');
     }
-  }, [isAuthenticated, user, router]);
+  }, [hasCheckedAuth, isAuthenticated, user, router]);
   
   // Tab state
   const [activeTab, setActiveTab] = useState('upload');
@@ -392,11 +416,20 @@ export default function AdminPage() {
     router.push('/login');
   };
 
-  // Don't render if not admin
+  // Show loading while checking auth
+  if (isAuthChecking || !hasCheckedAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loading size="lg" text="Checking authentication..." />
+      </div>
+    );
+  }
+
+  // Don't render if not admin (only after auth check is complete)
   if (!user || user.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loading />
+        <Loading size="lg" text="Redirecting..." />
       </div>
     );
   }

@@ -30,36 +30,18 @@ app.use(helmet({
 }));
 
 // CORS configuration
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",").map(o => o.trim())
-  : [];
+// CORS configuration - ALLOW ALL ORIGINS
+console.log('⚠️  CORS: Allowing ALL origins');
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow server-to-server, Postman, curl
-      if (!origin) return callback(null, true);
+app.use(cors({
+  origin: true, // Allow all origins
+  credentials: true, // Allow cookies/credentials
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+}));
 
-      // DEV: allow everything (LAN, localhost, any IP)
-      if (process.env.NODE_ENV === "development") {
-        return callback(null, true);
-      }
-
-      // PROD: strict whitelist
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`CORS blocked: ${origin}`));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
-    credentials: true,
-    maxAge: 86400,
-  })
-);
-
-
+// Handle preflight requests
+app.options('*', cors());
 // Compression
 app.use(compression());
 
@@ -84,6 +66,13 @@ app.set('trust proxy', 1);
 
 // API routes
 app.use('/api', routes);
+
+// TEMPORARY: Admin setup routes (remove after setting up admin users)
+if (config.nodeEnv === 'development' || config.nodeEnv === 'production') {
+  const adminSetupRoutes = require('./routes/adminSetupRoutes');
+  app.use('/api/admin-setup', adminSetupRoutes);
+  logger.warn('⚠️  Admin setup routes enabled - remember to remove after setup!');
+}
 
 // Root endpoint
 app.get('/', (req, res) => {

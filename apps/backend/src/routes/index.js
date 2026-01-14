@@ -12,12 +12,26 @@ const uploadRoutes = require('./uploadRoutes');
 const filesRoutes = require('./filesRoutes');
 
 // Health check
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+router.get('/health', async (req, res) => {
+  try {
+    // Test database connection
+    await require('../utils/prisma').$queryRaw`SELECT 1`;
+    
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'connected',
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'disconnected',
+      error: error.message,
+    });
+  }
 });
 
 // API info

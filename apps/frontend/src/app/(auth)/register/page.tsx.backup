@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Mail, UserPlus } from "lucide-react";
 import toast from 'react-hot-toast';
-import { LoadingOverlay } from '@/components/ui/loading';
+import { Loading } from '@/components/ui/loading';
 
 interface PupilProps {
   size?: number;
@@ -189,7 +189,6 @@ export default function RegisterPage() {
   const [isPinkBlinking, setIsPinkBlinking] = useState(false);
   const [isLimeBlinking, setIsLimeBlinking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
   
   // Unique animations for register page
   const [isWaving, setIsWaving] = useState(true); // Wave on page load
@@ -309,10 +308,8 @@ export default function RegisterPage() {
       await register({ name, email, password });
       console.log('Register function completed successfully');
       toast.success('Account created successfully! Please login.');
-      setIsRedirecting(true);
       router.push('/login');
     } catch (error: any) {
-      setIsRedirecting(false);
       console.error('Registration error details:', {
         message: error.message,
         response: error.response?.data,
@@ -330,13 +327,13 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
-      {/* Loading Overlay */}
-      <LoadingOverlay 
-        isVisible={isLoading || isRedirecting} 
-        text={isRedirecting ? "Redirecting to login..." : "Creating account..."} 
-      />
-      
+    <>
+      {isLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <Loading size="lg" />
+        </div>
+      )}
+      <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left Content Section */}
       <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-emerald-600/90 via-emerald-600 to-emerald-700/80 p-12 text-white">
         <div className="relative z-20">
@@ -514,23 +511,17 @@ export default function RegisterPage() {
                   top: isPasswordFocused && !showPassword ? '70px' : `${90 + (pinkPos.faceY || 0)}px`,
                 }}
               >
-                <EyeBall
-                  size={16}
-                  pupilSize={6}
-                  maxDistance={4}
-                  eyeColor="white"
-                  pupilColor="#2D2D2D"
-                  isBlinking={isPinkBlinking}
+                <Pupil 
+                  size={12} 
+                  maxDistance={5} 
+                  pupilColor="#2D2D2D" 
                   forceLookX={isPasswordFocused && !showPassword ? -5 : undefined}
                   forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
                 />
-                <EyeBall
-                  size={16}
-                  pupilSize={6}
-                  maxDistance={4}
-                  eyeColor="white"
+                <Pupil 
+                  size={12} 
+                  maxDistance={5} 
                   pupilColor="#2D2D2D"
-                  isBlinking={isPinkBlinking}
                   forceLookX={isPasswordFocused && !showPassword ? -5 : undefined}
                   forceLookY={isPasswordFocused && !showPassword ? -4 : undefined}
                 />
@@ -787,6 +778,6 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

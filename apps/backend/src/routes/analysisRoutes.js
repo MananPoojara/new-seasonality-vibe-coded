@@ -29,12 +29,16 @@ router.get('/symbols',
           id: true,
           symbol: true,
           name: true,
+          sector: true,
+          exchange: true,
+          currency: true,
           totalRecords: true,
           firstDataDate: true,
           lastDataDate: true,
           lastUpdated: true,
           _count: {
             select: {
+              seasonalityData: true,
               dailySeasonalityData: true,
               mondayWeeklyData: true,
               expiryWeeklyData: true,
@@ -48,20 +52,27 @@ router.get('/symbols',
 
       res.json({
         success: true,
-        data: symbols.map(ticker => ({
+        count: symbols.length,
+        symbols: symbols.map(ticker => ({
           id: ticker.id,
           symbol: ticker.symbol,
           name: ticker.name,
+          sector: ticker.sector,
+          exchange: ticker.exchange,
+          currency: ticker.currency,
           totalRecords: ticker.totalRecords,
           firstDataDate: ticker.firstDataDate,
           lastDataDate: ticker.lastDataDate,
           lastUpdated: ticker.lastUpdated,
+          hasData: ticker._count.seasonalityData > 0 ||
+                   ticker._count.dailySeasonalityData > 0,
           dataAvailable: {
-            daily: ticker._count.dailySeasonalityData,
-            mondayWeekly: ticker._count.mondayWeeklyData,
-            expiryWeekly: ticker._count.expiryWeeklyData,
-            monthly: ticker._count.monthlySeasonalityData,
-            yearly: ticker._count.yearlySeasonalityData
+            basic: ticker._count.seasonalityData > 0,
+            daily: ticker._count.dailySeasonalityData > 0,
+            mondayWeekly: ticker._count.mondayWeeklyData > 0,
+            expiryWeekly: ticker._count.expiryWeeklyData > 0,
+            monthly: ticker._count.monthlySeasonalityData > 0,
+            yearly: ticker._count.yearlySeasonalityData > 0
           }
         }))
       });

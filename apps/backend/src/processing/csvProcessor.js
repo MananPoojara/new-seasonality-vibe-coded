@@ -726,6 +726,7 @@ class CSVProcessor {
         
         counts.expiryWeekly = await batchUpsert('expiryWeeklyData', calculatedData.expiryWeekly, (r) => ({
           date: r.date,
+          startDate: r.startDate || null, // Added: Start date of expiry week (Date - 6 days)
           open: r.open || 0, high: r.high || 0, low: r.low || 0, close: r.close || 0,
           volume: r.volume || 0, openInterest: r.openInterest || 0,
           weekday: r.weekday || null,
