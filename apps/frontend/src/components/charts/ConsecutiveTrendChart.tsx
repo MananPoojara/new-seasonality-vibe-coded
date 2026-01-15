@@ -41,7 +41,7 @@ export function ConsecutiveTrendChart({
     return data.map((d, idx) => ({
       ...d,
       idx: idx + 1,
-      label: `${new Date(d.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`,
+      label: `${new Date(d.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`,
       isBullish: d.direction === 'Bullish',
     }));
   }, [data]);

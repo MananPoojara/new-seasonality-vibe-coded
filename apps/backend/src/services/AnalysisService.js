@@ -33,6 +33,7 @@ function calculateStatistics(records, returnField = 'returnPercentage') {
       sumReturnAll: 0,
       sumReturnPositive: 0,
       sumReturnNegative: 0,
+      cumulativeReturn: 0,
       winRate: 0,
       maxGain: 0,
       maxLoss: 0
@@ -46,6 +47,13 @@ function calculateStatistics(records, returnField = 'returnPercentage') {
   const sum = arr => arr.reduce((a, b) => a + b, 0);
   const avg = arr => arr.length > 0 ? sum(arr) / arr.length : 0;
 
+  // Calculate compound cumulative return
+  let cumulative = 1; // Start at 1 (100%)
+  for (const ret of returns) {
+    cumulative = cumulative * (1 + ret / 100);
+  }
+  const cumulativeReturn = (cumulative - 1) * 100; // Convert to percentage
+
   return {
     totalCount: records.length,
     positiveCount: positiveReturns.length,
@@ -56,6 +64,7 @@ function calculateStatistics(records, returnField = 'returnPercentage') {
     sumReturnAll: Number(sum(returns).toFixed(4)),
     sumReturnPositive: Number(sum(positiveReturns).toFixed(4)),
     sumReturnNegative: Number(sum(negativeReturns).toFixed(4)),
+    cumulativeReturn: Number(cumulativeReturn.toFixed(2)),
     winRate: Number(((positiveReturns.length / records.length) * 100).toFixed(2)),
     maxGain: Number(Math.max(...returns, 0).toFixed(4)),
     maxLoss: Number(Math.min(...returns, 0).toFixed(4))
