@@ -37,6 +37,7 @@ function calculateStatistics(records, returnField = 'returnPercentage') {
       winRate: 0,
       maxGain: 0,
       maxLoss: 0,
+      maxDrawdown: 0,
       cagr: 0,
       sharpeRatio: 0,
       stdDev: 0
@@ -50,11 +51,28 @@ function calculateStatistics(records, returnField = 'returnPercentage') {
   const sum = arr => arr.reduce((a, b) => a + b, 0);
   const avg = arr => arr.length > 0 ? sum(arr) / arr.length : 0;
 
-  // Calculate compound cumulative return
+  // Calculate compound cumulative return and track drawdown
   let cumulative = 1; // Start at 1 (100%)
+  let peak = 1; // Track the highest point
+  let maxDrawdown = 0; // Track maximum drawdown
+  
   for (const ret of returns) {
     cumulative = cumulative * (1 + ret / 100);
+    
+    // Update peak if we've reached a new high
+    if (cumulative > peak) {
+      peak = cumulative;
+    }
+    
+    // Calculate current drawdown from peak
+    const drawdown = ((cumulative - peak) / peak) * 100;
+    
+    // Update max drawdown if current is worse
+    if (drawdown < maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
   }
+  
   const cumulativeReturn = (cumulative - 1) * 100; // Convert to percentage
 
   // Calculate number of unique years
@@ -69,11 +87,12 @@ function calculateStatistics(records, returnField = 'returnPercentage') {
   }
   
   // Debug logging
-  console.log('CAGR Calculation:', {
+  console.log('Statistics Calculation:', {
     numberOfYears,
     cumulative,
     cumulativeReturn,
     cagr,
+    maxDrawdown,
     recordCount: records.length
   });
 
@@ -108,6 +127,7 @@ function calculateStatistics(records, returnField = 'returnPercentage') {
     winRate: Number(((positiveReturns.length / records.length) * 100).toFixed(2)),
     maxGain: Number(Math.max(...returns, 0).toFixed(4)),
     maxLoss: Number(Math.min(...returns, 0).toFixed(4)),
+    maxDrawdown: Number(maxDrawdown.toFixed(2)),
     cagr: Number(cagr.toFixed(2)),
     sharpeRatio: Number(sharpeRatio.toFixed(2)),
     stdDev: Number(stdDev.toFixed(4))

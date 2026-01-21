@@ -14,7 +14,10 @@ import { createChart, ColorType } from 'lightweight-charts';
 import { analysisApi } from '@/lib/api';
 import { useAnalysisStore } from '@/store/analysisStore';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { HelpCircle } from 'lucide-react';
 
 import { 
   SymbolSelector, 
@@ -23,7 +26,8 @@ import {
   MonthFilters, 
   WeekFilters, 
   DayFilters, 
-  OutlierFilters 
+  OutlierFilters,
+  SuperimposedChartFilter
 } from '@/components/filters';
 
 const Loading = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => (
@@ -193,6 +197,11 @@ export default function DailyPage() {
           <FilterSection title="Risk Management">
             <OutlierFilters />
           </FilterSection>
+
+          {/* Advanced Filters */}
+          <FilterSection title="Advanced Filters">
+            <SuperimposedChartFilter />
+          </FilterSection>
         </div>
 
         {/* Apply Filters Button */}
@@ -231,7 +240,7 @@ export default function DailyPage() {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* TOP HEADER */}
         <header className="flex-shrink-0 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4">
           <div className="flex items-center gap-4">
@@ -312,7 +321,7 @@ export default function DailyPage() {
               />
               <StatCard
                 label="MAX DRAWDOWN"
-                value={`${(stats.maxLoss || 0).toFixed(2)}%`}
+                value={`${(stats.maxDrawdown || 0).toFixed(2)}%`}
                 subtitle={`Max Gain: ${(stats.maxGain || 0).toFixed(2)}%`}
                 trend="down"
               />
@@ -331,7 +340,7 @@ export default function DailyPage() {
         )}
 
         {/* CHART AREA */}
-        <div className="flex-1 overflow-hidden p-4">
+        <div className={cn("flex-1 p-4", activeTab === 'data' ? 'overflow-visible' : 'overflow-hidden')}>
           <div className="h-full bg-white rounded-lg border border-slate-200 flex flex-col">
             {/* Chart Header */}
             <div className="flex-shrink-0 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -403,7 +412,7 @@ export default function DailyPage() {
                   Data
                 </button>
                 
-                {activeTab === 'chart' ? (
+                {activeTab === 'chart' && (
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -412,23 +421,12 @@ export default function DailyPage() {
                   >
                     SNAPSHOT
                   </Button>
-                ) : (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleExportCSV}
-                    disabled={!symbolData}
-                    className="gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export CSV
-                  </Button>
                 )}
               </div>
             </div>
 
             {/* Chart Content */}
-            <div className="flex-1 p-4 overflow-hidden" ref={chartRef}>
+            <div className={cn("flex-1 p-4", activeTab === 'data' ? 'overflow-visible' : 'overflow-hidden')} ref={chartRef}>
               <AnimatePresence mode="wait">
                 {isLoading ? (
                   <motion.div 
@@ -568,9 +566,40 @@ function CumulativeChart({ data, chartScale }: {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; date: string; value: number } | null>(null);
+  const { filters } = useAnalysisStore();
+  
+  const electionChartTypes = filters.electionChartTypes || ['All Years'];
+
+  // Election years data
+  const electionYears = {
+    'Election Years': [1952, 1957, 1962, 1967, 1971, 1977, 1980, 1984, 1989, 1991, 1996, 1998, 1999, 2004, 2009, 2014, 2019],
+    'Pre Election Years': [1951, 1956, 1961, 1966, 1970, 1976, 1979, 1983, 1988, 1990, 1995, 1997, 1998, 2003, 2008, 2013, 2018],
+    'Post Election Years': [1953, 1958, 1963, 1968, 1972, 1978, 1981, 1985, 1990, 1992, 1997, 1999, 2000, 2005, 2010, 2015, 2020],
+    'Mid Election Years': [1954, 1955, 1959, 1960, 1964, 1965, 1969, 1973, 1974, 1975, 1982, 1986, 1987, 1993, 1994, 2001, 2002, 2006, 2007, 2011, 2012, 2016, 2017, 2021, 2022],
+    'Modi Years': [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+  };
 
   useEffect(() => {
     if (!chartContainerRef.current || !data || data.length === 0) return;
+
+    // Filter data based on election chart types
+    let filteredData = [...data];
+    
+    if (!electionChartTypes.includes('All Years')) {
+      filteredData = data.filter((d: any) => {
+        const year = new Date(d.date).getFullYear();
+        const currentYear = new Date().getFullYear();
+        
+        return electionChartTypes.some(type => {
+          if (type === 'Current Year') {
+            return year === currentYear;
+          } else if (electionYears[type as keyof typeof electionYears]) {
+            return electionYears[type as keyof typeof electionYears].includes(year);
+          }
+          return false;
+        });
+      });
+    }
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -607,7 +636,7 @@ function CumulativeChart({ data, chartScale }: {
       lineWidth: 2,
     });
 
-    const chartData = data.map((d: any) => ({
+    const chartData = filteredData.map((d: any) => ({
       time: Math.floor(new Date(d.date).getTime() / 1000) as any,
       value: d.cumulative || 0,
       originalDate: d.date,
@@ -656,7 +685,7 @@ function CumulativeChart({ data, chartScale }: {
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [data, chartScale]);
+  }, [data, chartScale, electionChartTypes]);
 
   return (
     <div ref={chartContainerRef} className="h-full w-full relative">
@@ -683,6 +712,19 @@ function SuperimposedChart({ data, symbol }: { data: any[]; symbol: string }) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; day: number; value: number; avgReturn: number } | null>(null);
+  const { filters } = useAnalysisStore();
+  
+  const superimposedChartType = filters.superimposedChartType || 'CalendarYearDays';
+  const electionChartTypes = filters.electionChartTypes || ['All Years'];
+
+  // Election years data (from INDIA.csv)
+  const electionYears = {
+    'Election Years': [1952, 1957, 1962, 1967, 1971, 1977, 1980, 1984, 1989, 1991, 1996, 1998, 1999, 2004, 2009, 2014, 2019],
+    'Pre Election Years': [1951, 1956, 1961, 1966, 1970, 1976, 1979, 1983, 1988, 1990, 1995, 1997, 1998, 2003, 2008, 2013, 2018],
+    'Post Election Years': [1953, 1958, 1963, 1968, 1972, 1978, 1981, 1985, 1990, 1992, 1997, 1999, 2000, 2005, 2010, 2015, 2020],
+    'Mid Election Years': [1954, 1955, 1959, 1960, 1964, 1965, 1969, 1973, 1974, 1975, 1982, 1986, 1987, 1993, 1994, 2001, 2002, 2006, 2007, 2011, 2012, 2016, 2017, 2021, 2022],
+    'Modi Years': [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+  };
 
   // Calculate year range from data
   const yearRange = useMemo(() => {
@@ -700,19 +742,95 @@ function SuperimposedChart({ data, symbol }: { data: any[]; symbol: string }) {
   useEffect(() => {
     if (!chartContainerRef.current || !data || data.length === 0) return;
 
-    // Group by day-of-year and calculate average returns
+    // Filter data based on election chart types
+    let filteredData = [...data];
+    
+    if (!electionChartTypes.includes('All Years')) {
+      filteredData = data.filter((d: any) => {
+        const year = new Date(d.date).getFullYear();
+        const currentYear = new Date().getFullYear();
+        
+        return electionChartTypes.some(type => {
+          if (type === 'Current Year') {
+            return year === currentYear;
+          } else if (electionYears[type as keyof typeof electionYears]) {
+            return electionYears[type as keyof typeof electionYears].includes(year);
+          }
+          return false;
+        });
+      });
+    }
+
+    // Calculate trading day counters for the filtered data
+    const dataWithTradingDays = filteredData.map((d, idx) => {
+      const date = new Date(d.date);
+      let tradingYearDay = 1;
+      let tradingMonthDay = 1;
+      
+      // Calculate trading day by counting previous days in same year/month
+      for (let i = 0; i < idx; i++) {
+        const prevDate = new Date(filteredData[i].date);
+        if (prevDate.getFullYear() === date.getFullYear()) {
+          tradingYearDay++;
+        }
+        if (prevDate.getFullYear() === date.getFullYear() && 
+            prevDate.getMonth() === date.getMonth()) {
+          tradingMonthDay++;
+        }
+      }
+      
+      return {
+        ...d,
+        tradingYearDay,
+        tradingMonthDay,
+      };
+    });
+
+    // Group by the selected chart type
     const dayGroups: Record<number, number[]> = {};
     
-    data.forEach((d: any) => {
+    dataWithTradingDays.forEach((d: any) => {
       const date = new Date(d.date);
-      const year = date.getFullYear();
-      const startOfYear = new Date(year, 0, 1);
-      const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      let dayKey: number;
       
-      if (!dayGroups[dayOfYear]) {
-        dayGroups[dayOfYear] = [];
+      switch (superimposedChartType) {
+        case 'CalendarYearDays':
+          // Day of year (1-365/366)
+          const year = date.getFullYear();
+          const startOfYear = new Date(year, 0, 1);
+          dayKey = Math.floor((date.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          break;
+          
+        case 'TradingYearDays':
+          // Trading day of year (sequential counter)
+          dayKey = d.tradingYearDay;
+          break;
+          
+        case 'CalendarMonthDays':
+          // Day of month (1-31)
+          dayKey = date.getDate();
+          break;
+          
+        case 'TradingMonthDays':
+          // Trading day of month (sequential counter)
+          dayKey = d.tradingMonthDay;
+          break;
+          
+        case 'Weekdays':
+          // Day of week (0-6, where 0 is Sunday)
+          dayKey = date.getDay();
+          break;
+          
+        default:
+          const yearD = date.getFullYear();
+          const startOfYearD = new Date(yearD, 0, 1);
+          dayKey = Math.floor((date.getTime() - startOfYearD.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       }
-      dayGroups[dayOfYear].push(d.returnPercentage || 0);
+      
+      if (!dayGroups[dayKey]) {
+        dayGroups[dayKey] = [];
+      }
+      dayGroups[dayKey].push(d.returnPercentage || 0);
     });
 
     // Calculate average return for each day and compound it
@@ -824,12 +942,12 @@ function SuperimposedChart({ data, symbol }: { data: any[]; symbol: string }) {
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [data]);
+  }, [data, superimposedChartType, electionChartTypes]);
 
   return (
     <div className="h-full w-full relative">
       <div className="absolute top-2 left-2 z-10 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-        {symbol} - {yearRange ? `${yearRange.yearCount} Years (${yearRange.minYear}-${yearRange.maxYear})` : 'All Years'}
+        {symbol} - {superimposedChartType.replace(/([A-Z])/g, ' $1').trim()} - {yearRange ? `${yearRange.yearCount} Years (${yearRange.minYear}-${yearRange.maxYear})` : 'All Years'}
       </div>
       <div ref={chartContainerRef} className="h-full w-full" />
       {tooltip && tooltip.visible && (
@@ -840,9 +958,13 @@ function SuperimposedChart({ data, symbol }: { data: any[]; symbol: string }) {
             top: `${tooltip.y - 60}px`,
           }}
         >
-          <div className="font-semibold text-slate-700 mb-1">Day {tooltip.day}</div>
+          <div className="font-semibold text-slate-700 mb-1">
+            {superimposedChartType === 'Weekdays' 
+              ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][tooltip.day] 
+              : `Day ${tooltip.day}`}
+          </div>
           <div className="text-indigo-600 font-bold">
-            YTD Return: {tooltip.value.toFixed(2)}%
+            Compounded: {tooltip.value.toFixed(2)}%
           </div>
           <div className="text-slate-600">
             Avg Daily: {tooltip.avgReturn.toFixed(2)}%
@@ -858,9 +980,40 @@ function YearlyOverlayChart({ data, symbol }: { data: any[]; symbol: string }) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; day: number; values: Array<{ year: string; value: number; color: string }> } | null>(null);
+  const { filters } = useAnalysisStore();
+  
+  const electionChartTypes = filters.electionChartTypes || ['All Years'];
+
+  // Election years data
+  const electionYears = {
+    'Election Years': [1952, 1957, 1962, 1967, 1971, 1977, 1980, 1984, 1989, 1991, 1996, 1998, 1999, 2004, 2009, 2014, 2019],
+    'Pre Election Years': [1951, 1956, 1961, 1966, 1970, 1976, 1979, 1983, 1988, 1990, 1995, 1997, 1998, 2003, 2008, 2013, 2018],
+    'Post Election Years': [1953, 1958, 1963, 1968, 1972, 1978, 1981, 1985, 1990, 1992, 1997, 1999, 2000, 2005, 2010, 2015, 2020],
+    'Mid Election Years': [1954, 1955, 1959, 1960, 1964, 1965, 1969, 1973, 1974, 1975, 1982, 1986, 1987, 1993, 1994, 2001, 2002, 2006, 2007, 2011, 2012, 2016, 2017, 2021, 2022],
+    'Modi Years': [2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+  };
 
   useEffect(() => {
     if (!chartContainerRef.current || !data || data.length === 0) return;
+
+    // Filter data based on election chart types
+    let filteredData = [...data];
+    
+    if (!electionChartTypes.includes('All Years')) {
+      filteredData = data.filter((d: any) => {
+        const year = new Date(d.date).getFullYear();
+        const currentYear = new Date().getFullYear();
+        
+        return electionChartTypes.some(type => {
+          if (type === 'Current Year') {
+            return year === currentYear;
+          } else if (electionYears[type as keyof typeof electionYears]) {
+            return electionYears[type as keyof typeof electionYears].includes(year);
+          }
+          return false;
+        });
+      });
+    }
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -892,7 +1045,7 @@ function YearlyOverlayChart({ data, symbol }: { data: any[]; symbol: string }) {
 
     // Group data by year
     const yearGroups: Record<number, any[]> = {};
-    data.forEach((d: any) => {
+    filteredData.forEach((d: any) => {
       const date = new Date(d.date);
       const year = date.getFullYear();
       const startOfYear = new Date(year, 0, 1);
@@ -986,7 +1139,7 @@ function YearlyOverlayChart({ data, symbol }: { data: any[]; symbol: string }) {
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [data]);
+  }, [data, electionChartTypes]);
 
   return (
     <div ref={chartContainerRef} className="h-full w-full relative">
@@ -1021,11 +1174,12 @@ function YearlyOverlayChart({ data, symbol }: { data: any[]; symbol: string }) {
   );
 }
 
-// Seasonal Data Table
+// Seasonal Data Table with multiple views
 function SeasonalDataTable({ data }: { 
   data: any[]; 
 }) {
   const [page, setPage] = useState(0);
+  const [tableType, setTableType] = useState<string>('all-days');
   const pageSize = 20;
   
   if (!data) {
@@ -1043,41 +1197,252 @@ function SeasonalDataTable({ data }: {
       </div>
     );
   }
-  
-  const totalPages = Math.ceil(data.length / pageSize);
-  const paginatedData = data.slice(page * pageSize, (page + 1) * pageSize);
 
+  // Generate different table views based on tableType
+  const getTableData = () => {
+    switch (tableType) {
+      case 'all-days':
+        return data.map((row) => ({
+          date: new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          return: row.returnPercentage?.toFixed(2),
+          cumulative: row.cumulative?.toFixed(2),
+        }));
+      
+      case 'weekdays':
+        const weekdayGroups: Record<string, { returns: number[]; count: number }> = {};
+        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        data.forEach((row) => {
+          const weekday = weekdays[new Date(row.date).getDay()];
+          if (!weekdayGroups[weekday]) {
+            weekdayGroups[weekday] = { returns: [], count: 0 };
+          }
+          weekdayGroups[weekday].returns.push(row.returnPercentage || 0);
+          weekdayGroups[weekday].count++;
+        });
+        
+        return weekdays.map((day) => {
+          const group = weekdayGroups[day] || { returns: [], count: 0 };
+          const avgReturn = group.returns.length > 0 
+            ? group.returns.reduce((sum, val) => sum + val, 0) / group.returns.length 
+            : 0;
+          const positive = group.returns.filter(r => r > 0).length;
+          const negative = group.returns.filter(r => r < 0).length;
+          const winRate = group.count > 0 ? (positive / group.count) * 100 : 0;
+          
+          return {
+            weekday: day,
+            count: group.count,
+            avgReturn: avgReturn.toFixed(2),
+            positive,
+            negative,
+            winRate: winRate.toFixed(1),
+          };
+        }).filter(row => row.count > 0);
+      
+      case 'months':
+        const monthGroups: Record<number, { returns: number[]; count: number }> = {};
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        data.forEach((row) => {
+          const month = new Date(row.date).getMonth();
+          if (!monthGroups[month]) {
+            monthGroups[month] = { returns: [], count: 0 };
+          }
+          monthGroups[month].returns.push(row.returnPercentage || 0);
+          monthGroups[month].count++;
+        });
+        
+        return monthNames.map((monthName, idx) => {
+          const group = monthGroups[idx] || { returns: [], count: 0 };
+          const avgReturn = group.returns.length > 0 
+            ? group.returns.reduce((sum, val) => sum + val, 0) / group.returns.length 
+            : 0;
+          const positive = group.returns.filter(r => r > 0).length;
+          const negative = group.returns.filter(r => r < 0).length;
+          const winRate = group.count > 0 ? (positive / group.count) * 100 : 0;
+          
+          return {
+            month: monthName,
+            count: group.count,
+            avgReturn: avgReturn.toFixed(2),
+            positive,
+            negative,
+            winRate: winRate.toFixed(1),
+          };
+        }).filter(row => row.count > 0);
+      
+      case 'years':
+        const yearGroups: Record<number, { returns: number[]; count: number }> = {};
+        
+        data.forEach((row) => {
+          const year = new Date(row.date).getFullYear();
+          if (!yearGroups[year]) {
+            yearGroups[year] = { returns: [], count: 0 };
+          }
+          yearGroups[year].returns.push(row.returnPercentage || 0);
+          yearGroups[year].count++;
+        });
+        
+        return Object.keys(yearGroups).sort().map((year) => {
+          const group = yearGroups[parseInt(year)];
+          const avgReturn = group.returns.reduce((sum, val) => sum + val, 0) / group.returns.length;
+          const totalReturn = group.returns.reduce((sum, val) => sum + val, 0);
+          const positive = group.returns.filter(r => r > 0).length;
+          const negative = group.returns.filter(r => r < 0).length;
+          const winRate = (positive / group.count) * 100;
+          
+          return {
+            year,
+            count: group.count,
+            avgReturn: avgReturn.toFixed(2),
+            totalReturn: totalReturn.toFixed(2),
+            positive,
+            negative,
+            winRate: winRate.toFixed(1),
+          };
+        });
+      
+      default:
+        return [];
+    }
+  };
+
+  const tableData = getTableData();
+  const totalPages = Math.ceil(tableData.length / pageSize);
+  const paginatedData = tableData.slice(page * pageSize, (page + 1) * pageSize);
+
+  // Export CSV function
+  const handleExportCSV = () => {
+    if (!tableData || tableData.length === 0) return;
+    
+    const headers = Object.keys(tableData[0]).join(',');
+    const rows = tableData.map((row: any) => Object.values(row).join(',')).join('\n');
+    const csv = `${headers}\n${rows}`;
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.download = `${tableType}_data_${new Date().toISOString().split('T')[0]}.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  };
+
+  // Column descriptions for tooltips
+  const columnDescriptions: Record<string, string> = {
+    date: 'The trading date',
+    return: 'Daily return percentage - the percentage change from previous day',
+    cumulative: 'Cumulative return - the compounded return from the start date',
+    weekday: 'Day of the week',
+    month: 'Month of the year',
+    year: 'Calendar year',
+    count: 'Number of trading days in this period',
+    avgReturn: 'Average return - mean of all returns in this period',
+    totalReturn: 'Total return - sum of all returns in this period',
+    positive: 'Number of days with positive returns',
+    negative: 'Number of days with negative returns',
+    winRate: 'Win rate - percentage of days with positive returns (positive days / total days × 100)',
+  };
+
+  const renderTableHeaders = () => {
+    if (tableData.length === 0) return null;
+    
+    return Object.keys(tableData[0]).map((key) => {
+      const displayName = key.replace(/([A-Z])/g, ' $1').trim();
+      const description = columnDescriptions[key];
+      
+      return (
+        <th key={key} className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+          <div className="flex items-center gap-1.5">
+            <span>{displayName}</span>
+            {description && (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>{description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </th>
+      );
+    });
+  };
+
+  const renderTableRows = () => {
+    return paginatedData.map((row: any, idx) => (
+      <tr key={idx} className="hover:bg-slate-50">
+        {Object.entries(row).map(([key, value], cellIdx) => (
+          <td 
+            key={cellIdx} 
+            className={cn(
+              "px-4 py-2 text-sm",
+              key.includes('return') || key.includes('Return') 
+                ? parseFloat(value as string) >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'
+                : key.includes('winRate') || key.includes('Win')
+                ? parseFloat(value as string) >= 50 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'
+                : 'text-slate-900'
+            )}
+          >
+            {value as string}
+          </td>
+        ))}
+      </tr>
+    ));
+  };
+  
   return (
     <div className="h-full flex flex-col">
+      {/* Table Type Selector and Export */}
+      <div className="flex-shrink-0 p-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-semibold text-slate-600">Table View:</label>
+          <Select value={tableType} onValueChange={(value) => { setTableType(value); setPage(0); }}>
+            <SelectTrigger className="w-48 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-white shadow-lg">
+              <SelectItem value="all-days">All Days</SelectItem>
+              <SelectItem value="weekdays">By Weekday</SelectItem>
+              <SelectItem value="months">By Month</SelectItem>
+              <SelectItem value="years">By Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleExportCSV}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
+      </div>
+
+      {/* Table Content */}
       <div className="flex-1 overflow-auto">
         <table className="w-full">
-          <thead className="bg-slate-50 sticky top-0">
+          <thead className="bg-slate-50 sticky top-0 z-[100]">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Date</th>
-              <th className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Return %</th>
-              <th className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Cumulative</th>
+              {renderTableHeaders()}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {paginatedData.map((row, idx) => (
-              <tr key={idx} className="hover:bg-slate-50">
-                <td className="px-4 py-2 text-sm font-medium text-slate-900">
-                  {new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </td>
-                <td className={`px-4 py-2 text-sm font-semibold ${row.returnPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {row.returnPercentage?.toFixed(2)}%
-                </td>
-                <td className="px-4 py-2 text-sm text-slate-600">{row.cumulative?.toFixed(2)}</td>
-              </tr>
-            ))}
+            {renderTableRows()}
           </tbody>
         </table>
       </div>
       
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex-shrink-0 p-4 border-t flex items-center justify-between">
           <span className="text-sm text-slate-500">
-            Page {page + 1} of {totalPages} ({data.length} records)
+            Page {page + 1} of {totalPages} ({tableData.length} records)
           </span>
           <div className="flex gap-2">
             <button

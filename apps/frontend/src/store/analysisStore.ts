@@ -67,6 +67,9 @@ const defaultFilters: FilterConfig = {
   specialDaysFilters: {
     selectedDays: [],
   },
+  superimposedChartType: 'CalendarYearDays',
+  weeklySuperimposedChartType: 'YearlyWeeks',
+  electionChartTypes: ['All Years'],
 };
 
 export const useAnalysisStore = create<AnalysisState>((set) => ({

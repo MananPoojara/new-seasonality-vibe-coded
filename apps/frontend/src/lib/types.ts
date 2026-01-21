@@ -6,6 +6,9 @@ export interface FilterConfig {
   dayFilters?: DayFilters;
   outlierFilters?: OutlierFilters;
   specialDaysFilters?: SpecialDaysFilters;
+  superimposedChartType?: 'CalendarYearDays' | 'TradingYearDays' | 'CalendarMonthDays' | 'TradingMonthDays' | 'Weekdays';
+  weeklySuperimposedChartType?: 'YearlyWeeks' | 'MonthlyWeeks';
+  electionChartTypes?: string[];
 }
 
 export interface YearFilters {
