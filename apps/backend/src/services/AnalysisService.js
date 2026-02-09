@@ -1070,6 +1070,263 @@ class AnalysisService {
   }
 
   /**
+   * Scenario Analysis - POST /analysis/scenario
+   * Implements the 4 main scenario features:
+   * 1. Historic Trending Days
+   * 2. Trending Streak
+   * 3. Momentum Ranking
+   * 4. Watchlist Analysis
+   */
+  async scenarioAnalysis(symbol, params) {
+    const startTime = Date.now();
+    const cacheKey = generateCacheKey(`scenario:${symbol}`, params);
+
+    // Check cache
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      logger.info(`Cache hit for scenario analysis: ${symbol}`);
+      return { ...cached, fromCache: true };
+    }
+
+    // Get ticker
+    const ticker = await prisma.ticker.findUnique({
+      where: { symbol: symbol.toUpperCase() }
+    });
+
+    if (!ticker) {
+      throw new Error(`Symbol not found: ${symbol}`);
+    }
+
+    // Get filtered daily data first
+    const dailyResult = await this.dailyAnalysis(symbol, params);
+    const records = dailyResult.tableData;
+
+    // Get full records with all fields for calculations
+    const where = await buildDailyWhereClause(ticker.id, params);
+    delete where._electionYears;
+    delete where._specificMonth;
+
+    let fullRecords = await prisma.dailySeasonalityData.findMany({
+      where,
+      orderBy: { date: 'asc' }
+    });
+
+    fullRecords = applyComplexFilters(fullRecords, params);
+
+    // 1. Historic Trending Days
+    const historicTrend = this.calculateHistoricTrend(
+      fullRecords,
+      params.historicTrendType || 'Bullish',
+      params.consecutiveDays || 3,
+      params.dayRange || 10
+    );
+
+    // 2. Trending Streak (placeholder - needs more complex logic)
+    const trendingStreak = this.calculateTrendingStreak(
+      fullRecords,
+      params.trendingStreakValue || 5,
+      params.trendingStreakType || 'less',
+      params.trendingStreakPercent || 0
+    );
+
+    // 3. Momentum Ranking (placeholder - needs watchlist data)
+    const momentumRanking = [];
+
+    // 4. Watchlist Analysis (placeholder - needs watchlist data)
+    const watchlistAnalysis = null;
+
+    const result = {
+      symbol: ticker.symbol,
+      timeframe: 'scenario',
+      historicTrend,
+      trendingStreak,
+      momentumRanking,
+      watchlistAnalysis,
+      meta: {
+        processingTime: Date.now() - startTime,
+        recordsAnalyzed: fullRecords.length,
+        filtersApplied: params.filters || {}
+      }
+    };
+
+    // Cache result
+    await cache.set(cacheKey, result, CACHE_TTL);
+
+    return result;
+  }
+
+  /**
+   * Calculate Historic Trending Days
+   * Finds days after N consecutive bullish/bearish days
+   * and calculates superimposed returns
+   */
+  calculateHistoricTrend(records, trendType, consecutiveDays, dayRange) {
+    if (!records || records.length === 0) {
+      return null;
+    }
+
+    // Get return points (we'll use returnPercentage as proxy)
+    const returns = records.map(r => r.returnPercentage || 0);
+    
+    // Find consecutive trending days
+    const trendingDates = [];
+    let consecutiveCount = 0;
+    
+    for (let i = 0; i < records.length; i++) {
+      const ret = returns[i];
+      const isTrending = trendType === 'Bullish' ? ret > 0 : ret < 0;
+      
+      if (isTrending) {
+        consecutiveCount++;
+        if (consecutiveCount === consecutiveDays) {
+          trendingDates.push(i);
+          consecutiveCount = 0; // Reset to find next occurrence
+        }
+      } else {
+        consecutiveCount = 0;
+      }
+    }
+
+    // Calculate returns before and after each trending date
+    const columns = [];
+    for (let i = -dayRange; i < 0; i++) {
+      columns.push(`T${i}`);
+    }
+    columns.push('T');
+    for (let i = 1; i <= dayRange; i++) {
+      columns.push(`T+${i}`);
+    }
+
+    const tableData = [];
+    for (const trendIdx of trendingDates) {
+      const row = { date: records[trendIdx].date };
+      
+      // Before days
+      for (let i = -dayRange; i < 0; i++) {
+        const idx = trendIdx + i;
+        row[`T${i}`] = idx >= 0 ? (returns[idx] || 0).toFixed(2) : null;
+      }
+      
+      // Current day
+      row['T'] = (returns[trendIdx] || 0).toFixed(2);
+      
+      // After days
+      for (let i = 1; i <= dayRange; i++) {
+        const idx = trendIdx + i;
+        row[`T+${i}`] = idx < returns.length ? (returns[idx] || 0).toFixed(2) : null;
+      }
+      
+      tableData.push(row);
+    }
+
+    // Calculate statistics for each column
+    const statistics = {};
+    for (const col of columns) {
+      const values = tableData.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
+      if (values.length > 0) {
+        const positiveValues = values.filter(v => v > 0);
+        const negativeValues = values.filter(v => v < 0);
+        const sum = values.reduce((a, b) => a + b, 0);
+        const avg = sum / values.length;
+        
+        statistics[col] = {
+          count: values.length,
+          positiveCount: positiveValues.length,
+          negativeCount: negativeValues.length,
+          avgReturn: Number(avg.toFixed(4)),
+          sumReturn: Number(sum.toFixed(4))
+        };
+      }
+    }
+
+    // Calculate superimposed returns (compounded)
+    const superimposedReturns = [];
+    let cumulative = 1;
+    for (const col of columns) {
+      const avgReturn = statistics[col]?.avgReturn || 0;
+      cumulative = cumulative * (1 + avgReturn / 100);
+      superimposedReturns.push({
+        day: col,
+        value: Number(((cumulative - 1) * 100).toFixed(2))
+      });
+    }
+
+    return {
+      trendType,
+      consecutiveDays,
+      dayRange,
+      columns,
+      tableData: tableData.slice(0, 100), // Limit to 100 rows
+      statistics,
+      superimposedReturns,
+      totalOccurrences: trendingDates.length
+    };
+  }
+
+  /**
+   * Calculate Trending Streak
+   * Finds streaks of consecutive days with specific characteristics
+   */
+  calculateTrendingStreak(records, streakValue, streakType, percentThreshold) {
+    if (!records || records.length === 0) {
+      return [];
+    }
+
+    const streaks = [];
+    let currentStreak = null;
+    let streakCount = 0;
+
+    for (let i = 0; i < records.length; i++) {
+      const ret = records[i].returnPercentage || 0;
+      const meetsCondition = streakType === 'more' ? ret > percentThreshold : ret < percentThreshold;
+
+      if (meetsCondition) {
+        if (!currentStreak) {
+          currentStreak = {
+            startDate: records[i].date,
+            startClose: records[i].close,
+            startIdx: i
+          };
+        }
+        streakCount++;
+      } else {
+        if (currentStreak && streakCount >= streakValue) {
+          const endIdx = i - 1;
+          const percentChange = ((records[endIdx].close - currentStreak.startClose) / currentStreak.startClose) * 100;
+          
+          streaks.push({
+            startDate: currentStreak.startDate,
+            startClose: currentStreak.startClose,
+            endDate: records[endIdx].date,
+            endClose: records[endIdx].close,
+            totalDays: streakCount,
+            percentChange: Number(percentChange.toFixed(2))
+          });
+        }
+        currentStreak = null;
+        streakCount = 0;
+      }
+    }
+
+    // Check last streak
+    if (currentStreak && streakCount >= streakValue) {
+      const endIdx = records.length - 1;
+      const percentChange = ((records[endIdx].close - currentStreak.startClose) / currentStreak.startClose) * 100;
+      
+      streaks.push({
+        startDate: currentStreak.startDate,
+        startClose: currentStreak.startClose,
+        endDate: records[endIdx].date,
+        endClose: records[endIdx].close,
+        totalDays: streakCount,
+        percentChange: Number(percentChange.toFixed(2))
+      });
+    }
+
+    return streaks;
+  }
+
+  /**
    * Clear cache for a symbol (call when new data is uploaded)
    */
   async clearSymbolCache(symbol) {
@@ -1078,7 +1335,8 @@ class AnalysisService {
       `analysis:daily-aggregate:*${symbol}*`,
       `analysis:weekly:*${symbol}*`,
       `analysis:monthly:*${symbol}*`,
-      `analysis:yearly:*${symbol}*`
+      `analysis:yearly:*${symbol}*`,
+      `analysis:scenario:*${symbol}*`
     ];
 
     for (const pattern of patterns) {

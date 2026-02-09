@@ -199,9 +199,13 @@ export interface MonthlyAnalysisParams {
 }
 
 export interface YearlyAnalysisParams {
-  symbols: string[];
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
   startDate: string;
   endDate: string;
+  yearType?: 'calendar' | 'expiry';
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
   overlayType?: 'CalendarDays' | 'TradingDays';
 }
 
@@ -209,12 +213,29 @@ export interface ScenarioParams {
   symbol: string;
   startDate: string;
   endDate: string;
-  entryDay?: string;
-  exitDay?: string;
-  entryType?: 'Open' | 'Close';
-  exitType?: 'Open' | 'Close';
-  tradeType?: 'Long' | 'Short';
-  returnType?: 'Percent' | 'Points';
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
+  historicTrendType?: 'Bullish' | 'Bearish';
+  consecutiveDays?: number;
+  dayRange?: number;
+  // Trending Streak params
+  trendingStreakValue?: number;
+  trendingStreakType?: 'more' | 'less';
+  trendingStreakPercent?: number;
+  // Momentum Ranking params
+  watchlist?: string;
+  momentumTrendType?: number;
+  atrPeriod?: number;
+  recentDays1?: number;
+  recentDays2?: number;
+  recentMonths1?: number;
+  recentMonths2?: number;
+  // Watchlist Analysis params
+  watchlistName?: string;
+  recentWeek?: number;
+  recentMonth1?: number;
+  recentMonth2?: number;
+  recentMonth3?: number;
 }
 
 export interface ScannerParams {

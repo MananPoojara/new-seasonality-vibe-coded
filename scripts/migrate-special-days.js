@@ -45,17 +45,17 @@ const getCategoryAndCountry = (name) => {
 };
 
 async function migrateSpecialDays() {
-  console.log('🚀 Starting Special Days Migration...\n');
+  console.log(' Starting Special Days Migration...\n');
   
   // Go back to project root to find CSV
   const csvPath = path.join(process.cwd(), '..', '..', 'old-software', 'SpecialDays', 'SpecialDays.csv');
   
   if (!fs.existsSync(csvPath)) {
-    console.error(`❌ CSV file not found: ${csvPath}`);
+    console.error(` CSV file not found: ${csvPath}`);
     process.exit(1);
   }
   
-  console.log(`📂 Reading CSV file: ${csvPath}`);
+  console.log(` Reading CSV file: ${csvPath}`);
   const csvContent = fs.readFileSync(csvPath, 'utf-8');
   
   // Parse CSV
@@ -64,12 +64,12 @@ async function migrateSpecialDays() {
     skip_empty_lines: true,
     trim: true,
   });
-  
-  console.log(`📊 Found ${records.length} rows in CSV\n`);
+
+  console.log(` Found ${records.length} rows in CSV\n`);
   
   // First row contains the special day names (headers)
   const specialDayNames = Object.keys(records[0]);
-  console.log(`📋 Special Day Categories: ${specialDayNames.length}`);
+  console.log(` Special Day Categories: ${specialDayNames.length}`);
   specialDayNames.forEach((name, idx) => {
     console.log(`   ${idx + 1}. ${name}`);
   });
@@ -97,7 +97,7 @@ async function migrateSpecialDays() {
         
         // Validate date
         if (isNaN(date.getTime())) {
-          console.warn(`⚠️  Invalid date: ${dateStr} for ${specialDayName}`);
+          console.warn(`  Invalid date: ${dateStr} for ${specialDayName}`);
           skippedCount++;
           continue;
         }
@@ -112,19 +112,19 @@ async function migrateSpecialDays() {
           category,
         });
       } catch (error) {
-        console.warn(`⚠️  Error parsing date: ${dateStr} for ${specialDayName}`);
+        console.warn(`  Error parsing date: ${dateStr} for ${specialDayName}`);
         skippedCount++;
       }
     }
   }
   
-  console.log(`\n📈 Statistics:`);
+  console.log(`\n Statistics:`);
   console.log(`   Total special day entries: ${specialDaysToInsert.length}`);
   console.log(`   Skipped empty/invalid entries: ${skippedCount}`);
   console.log('');
   
   // Clear existing special days
-  console.log('🗑️  Clearing existing special days...');
+  console.log('  Clearing existing special days...');
   const deleteResult = await prisma.specialDay.deleteMany({});
   console.log(`   Deleted ${deleteResult.count} existing records\n`);
   
@@ -132,7 +132,7 @@ async function migrateSpecialDays() {
   const batchSize = 100;
   let insertedCount = 0;
   
-  console.log('💾 Inserting special days into database...');
+  console.log(' Inserting special days into database...');
   
   for (let i = 0; i < specialDaysToInsert.length; i += batchSize) {
     const batch = specialDaysToInsert.slice(i, i + batchSize);
@@ -147,7 +147,7 @@ async function migrateSpecialDays() {
       const progress = ((insertedCount / specialDaysToInsert.length) * 100).toFixed(1);
       process.stdout.write(`\r   Progress: ${insertedCount}/${specialDaysToInsert.length} (${progress}%)`);
     } catch (error) {
-      console.error(`\n❌ Error inserting batch starting at index ${i}:`, error);
+      console.error(`\n Error inserting batch starting at index ${i}:`, error);
     }
   }
   
@@ -155,11 +155,11 @@ async function migrateSpecialDays() {
   
   // Verify insertion
   const totalInserted = await prisma.specialDay.count();
-  console.log(`✅ Migration completed!`);
+  console.log(` Migration completed!`);
   console.log(`   Total records in database: ${totalInserted}\n`);
   
   // Show summary by category
-  console.log('📊 Summary by Category:');
+  console.log(' Summary by Category:');
   const categories = await prisma.specialDay.groupBy({
     by: ['category', 'country'],
     _count: true,
@@ -172,7 +172,7 @@ async function migrateSpecialDays() {
   console.log('');
   
   // Show sample records
-  console.log('📝 Sample Records:');
+  console.log(' Sample Records:');
   const samples = await prisma.specialDay.findMany({
     take: 5,
     orderBy: { date: 'desc' },
@@ -182,13 +182,13 @@ async function migrateSpecialDays() {
     console.log(`   ${sample.name} - ${sample.date.toISOString().split('T')[0]} (${sample.country})`);
   });
   
-  console.log('\n✨ Special Days migration completed successfully!\n');
+  console.log('\n Special Days migration completed successfully!\n');
 }
 
 // Run migration
 migrateSpecialDays()
   .catch((error) => {
-    console.error('❌ Migration failed:', error);
+    console.error('Migration failed:', error);
     process.exit(1);
   })
   .finally(async () => {

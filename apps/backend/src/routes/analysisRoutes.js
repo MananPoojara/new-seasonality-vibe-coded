@@ -976,6 +976,44 @@ router.post('/yearly',
 );
 
 /**
+ * POST /analysis/scenario
+ * Scenario analysis with multiple outputs:
+ * - Historic Trending Days
+ * - Trending Streak
+ * - Momentum Ranking
+ * - Watchlist Analysis
+ */
+router.post('/scenario',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol, ...params } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      logger.info(`Scenario analysis request for ${symbol}`);
+
+      const result = await AnalysisService.scenarioAnalysis(symbol, params);
+
+      res.json({
+        success: true,
+        data: {
+          [symbol]: result
+        }
+      });
+    } catch (error) {
+      logger.error('Scenario analysis error', { error: error.message });
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /analysis/cache/clear
  * Clear cache for a symbol (admin only)
  */

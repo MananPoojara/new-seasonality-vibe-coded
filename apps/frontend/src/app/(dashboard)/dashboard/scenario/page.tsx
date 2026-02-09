@@ -1,170 +1,566 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Play, BarChart3, Activity, Filter, 
+  ChevronDown, Download, ChevronLeft, ChevronRight,
+  ArrowUpRight, ArrowDownRight, RefreshCw,
+  Settings, LogOut, TrendingUp, TrendingDown
+} from 'lucide-react';
+
 import { analysisApi } from '@/lib/api';
 import { useAnalysisStore } from '@/store/analysisStore';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loading } from '@/components/ui/loading';
-import { SymbolSelector, DateRangePicker } from '@/components/filters';
-import { Label } from '@/components/ui/label';
-import { RefreshCw } from 'lucide-react';
-import { cn, formatPercentage } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
-const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+import { 
+  SymbolSelector, 
+  DateRangePicker, 
+  YearFilters, 
+  MonthFilters,
+  WeekFilters,
+  DayFilters,
+  OutlierFilters
+} from '@/components/filters';
+
+const Loading = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => (
+  <div className="flex items-center justify-center">
+    <RefreshCw className={cn("animate-spin text-purple-600", size === 'lg' ? 'h-10 w-10' : 'h-6 w-6')} />
+  </div>
+);
 
 export default function ScenarioPage() {
-  const { selectedSymbols, startDate, endDate } = useAnalysisStore();
-  const [entryDay, setEntryDay] = useState('Monday');
-  const [exitDay, setExitDay] = useState('Friday');
-  const [entryType, setEntryType] = useState<'Open' | 'Close'>('Close');
-  const [exitType, setExitType] = useState<'Open' | 'Close'>('Close');
-  const [tradeType, setTradeType] = useState<'Long' | 'Short'>('Long');
+  const { selectedSymbols, startDate, endDate, filters, chartScale } = useAnalysisStore();
+  const [activeSection, setActiveSection] = useState<'historic' | 'streak' | 'momentum' | 'watchlist'>('historic');
+  const [filterOpen, setFilterOpen] = useState(true);
+  const [filterWidth, setFilterWidth] = useState(280);
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Scenario-specific state
+  const [historicTrendType, setHistoricTrendType] = useState<'Bullish' | 'Bearish'>('Bullish');
+  const [consecutiveDays, setConsecutiveDays] = useState(3);
+  const [dayRange, setDayRange] = useState(10);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX - 64;
+    if (newWidth >= 200 && newWidth <= 500) {
+      setFilterWidth(newWidth);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsResizing(false);
+  };
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing]);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['scenario-analysis', selectedSymbols[0], startDate, endDate, entryDay, exitDay, entryType, exitType, tradeType],
+    queryKey: ['scenario-analysis', selectedSymbols, startDate, endDate, filters, historicTrendType, consecutiveDays, dayRange],
     queryFn: async () => {
       const response = await analysisApi.scenario({
         symbol: selectedSymbols[0],
         startDate,
         endDate,
-        entryDay,
-        exitDay,
-        entryType,
-        exitType,
-        tradeType,
-        returnType: 'Percent',
+        filters,
+        chartScale,
+        historicTrendType,
+        consecutiveDays,
+        dayRange,
       });
-      return response.data;
+      return response.data.data;
     },
     enabled: selectedSymbols.length > 0,
   });
 
+  const symbolData = data?.[selectedSymbols[0]];
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Scenario Analysis</h1>
-        <Button onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-          Analyze
-        </Button>
+    <div className="flex h-full bg-slate-50" style={{ userSelect: isResizing ? 'none' : 'auto' }}>
+      {/* LEFT SIDEBAR - FILTER CONSOLE */}
+      <aside 
+        style={{ 
+          width: filterOpen ? filterWidth : 0,
+          transition: isResizing ? 'none' : 'width 0.3s ease-out'
+        }}
+        className="bg-white border-r border-slate-200 flex flex-col overflow-hidden relative"
+      >
+        <div className="flex-shrink-0 h-14 border-b border-slate-100 flex items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-purple-600" />
+            <h2 className="font-bold text-sm text-slate-700 uppercase tracking-wider">Scenario Filters</h2>
+          </div>
+          <button 
+            onClick={() => setFilterOpen(false)}
+            className="p-1 hover:bg-slate-100 rounded"
+          >
+            <ChevronLeft className="h-4 w-4 text-slate-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {/* Market Context */}
+          <FilterSection title="Market Context" defaultOpen>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1 block">Asset Class</label>
+                <SymbolSelector />
+              </div>
+            </div>
+          </FilterSection>
+
+          {/* Time Ranges */}
+          <FilterSection title="Time Ranges" defaultOpen>
+            <div className="space-y-3">
+              <DateRangePicker />
+            </div>
+          </FilterSection>
+
+          {/* Year Filters */}
+          <FilterSection title="Year Filters">
+            <YearFilters />
+          </FilterSection>
+
+          {/* Month Filters */}
+          <FilterSection title="Month Filters">
+            <MonthFilters />
+          </FilterSection>
+
+          {/* Week Filters */}
+          <FilterSection title="Week Filters">
+            <WeekFilters />
+          </FilterSection>
+
+          {/* Day Filters */}
+          <FilterSection title="Day Filters">
+            <DayFilters />
+          </FilterSection>
+
+          {/* Risk Management */}
+          <FilterSection title="Risk Management">
+            <OutlierFilters />
+          </FilterSection>
+
+          {/* Historic Trend Settings */}
+          <FilterSection title="Historic Trend Settings">
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1 block">Trend Type</label>
+                <Select value={historicTrendType} onValueChange={(v) => setHistoricTrendType(v as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white shadow-lg">
+                    <SelectItem value="Bullish">Bullish</SelectItem>
+                    <SelectItem value="Bearish">Bearish</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1 block">Consecutive Days: {consecutiveDays}</label>
+                <input
+                  type="range"
+                  min="2"
+                  max="10"
+                  value={consecutiveDays}
+                  onChange={(e) => setConsecutiveDays(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1 block">Day Range: {dayRange}</label>
+                <input
+                  type="range"
+                  min="5"
+                  max="25"
+                  step="5"
+                  value={dayRange}
+                  onChange={(e) => setDayRange(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </FilterSection>
+        </div>
+
+        {/* Apply Filters Button */}
+        <div className="flex-shrink-0 p-3 border-t border-slate-100">
+          <Button 
+            onClick={() => refetch()} 
+            disabled={isFetching || selectedSymbols.length === 0}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg"
+          >
+            {isFetching ? (
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Computing...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Play className="h-4 w-4 fill-current" />
+                APPLY FILTERS
+              </div>
+            )}
+          </Button>
+        </div>
+
+        {/* RESIZE HANDLE */}
+        {filterOpen && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={cn(
+              "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-purple-400 transition-colors group",
+              isResizing && "bg-purple-500"
+            )}
+          >
+            <div className="absolute right-0 top-0 bottom-0 w-4 -mr-2" />
+          </div>
+        )}
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* TOP HEADER */}
+        <header className="flex-shrink-0 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4">
+          <div className="flex items-center gap-4">
+            {!filterOpen && (
+              <button 
+                onClick={() => setFilterOpen(true)}
+                className="p-2 hover:bg-slate-100 rounded"
+              >
+                <ChevronRight className="h-5 w-5 text-slate-400" />
+              </button>
+            )}
+            <div className="flex items-center gap-3">
+              <Activity className="h-6 w-6 text-purple-600" />
+              <div>
+                <h1 className="text-lg font-bold text-slate-900">
+                  {selectedSymbols[0] || 'Select Symbol'}
+                </h1>
+                <p className="text-xs text-slate-500">Scenario Analysis Engine</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* User Profile Section */}
+            <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-200">
+              <button
+                onClick={() => {}}
+                className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                title="Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = '/login';
+                  }
+                }}
+                className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-all"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold text-xs cursor-pointer" title={selectedSymbols[0] || 'User'}>
+                {selectedSymbols[0]?.charAt(0) || 'U'}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* SECTION TABS */}
+        <div className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveSection('historic')}
+              className={cn(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
+                activeSection === 'historic' 
+                  ? "bg-purple-100 text-purple-700" 
+                  : "text-slate-600 hover:bg-slate-100"
+              )}
+            >
+              Historic Trending Days
+            </button>
+            <button
+              onClick={() => setActiveSection('streak')}
+              className={cn(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
+                activeSection === 'streak' 
+                  ? "bg-purple-100 text-purple-700" 
+                  : "text-slate-600 hover:bg-slate-100"
+              )}
+            >
+              Trending Streak
+            </button>
+            <button
+              onClick={() => setActiveSection('momentum')}
+              className={cn(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
+                activeSection === 'momentum' 
+                  ? "bg-purple-100 text-purple-700" 
+                  : "text-slate-600 hover:bg-slate-100"
+              )}
+            >
+              Momentum Ranking
+            </button>
+            <button
+              onClick={() => setActiveSection('watchlist')}
+              className={cn(
+                "px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
+                activeSection === 'watchlist' 
+                  ? "bg-purple-100 text-purple-700" 
+                  : "text-slate-600 hover:bg-slate-100"
+              )}
+            >
+              Watchlist Analysis
+            </button>
+          </div>
+        </div>
+
+        {/* CONTENT AREA */}
+        <div className="flex-1 p-4 overflow-auto">
+          <div className="h-full bg-white rounded-lg border border-slate-200 p-4">
+            <AnimatePresence mode="wait">
+              {isLoading ? (
+                <motion.div 
+                  key="loading"
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }}
+                  className="h-full flex flex-col items-center justify-center"
+                >
+                  <Loading size="lg" />
+                  <p className="mt-4 text-sm text-slate-500">Loading scenario data...</p>
+                </motion.div>
+              ) : !symbolData ? (
+                <motion.div 
+                  key="empty"
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }}
+                  className="h-full flex flex-col items-center justify-center"
+                >
+                  <BarChart3 className="h-16 w-16 text-slate-200 mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-700">System Idle</h3>
+                  <p className="text-sm text-slate-500 mt-2">Configure filters and click Apply Filters</p>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="content"
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }}
+                  className="h-full"
+                >
+                  {activeSection === 'historic' && <HistoricTrendingSection data={symbolData.historicTrend} />}
+                  {activeSection === 'streak' && <TrendingStreakSection data={symbolData.trendingStreak} />}
+                  {activeSection === 'momentum' && <MomentumRankingSection data={symbolData.momentumRanking} />}
+                  {activeSection === 'watchlist' && <WatchlistAnalysisSection data={symbolData.watchlistAnalysis} />}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Filter Section Component
+function FilterSection({ title, children, defaultOpen = false }: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 flex items-center justify-between transition-colors"
+      >
+        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</span>
+        <ChevronDown className={cn(
+          "h-4 w-4 text-slate-400 transition-transform",
+          isOpen && "rotate-180"
+        )} />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-3 bg-white">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Historic Trending Days Section
+function HistoricTrendingSection({ data }: { data: any }) {
+  if (!data) return <div className="text-center text-slate-500">No data available</div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold text-slate-800">Historically Trending Days</h3>
+      <p className="text-sm text-slate-600">
+        Analysis of days following {data.consecutiveDays} consecutive {data.trendType.toLowerCase()} days
+      </p>
+      
+      {/* Chart placeholder */}
+      <div className="h-96 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-center">
+        <p className="text-slate-400">Superimposed Returns Chart</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Trade Setup</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SymbolSelector />
-            <DateRangePicker />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <Label>Entry Day</Label>
-              <Select value={entryDay} onValueChange={setEntryDay}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-white">
-                  {weekdays.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Exit Day</Label>
-              <Select value={exitDay} onValueChange={setExitDay}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-white">
-                  {weekdays.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Entry Type</Label>
-              <Select value={entryType} onValueChange={(v) => setEntryType(v as 'Open' | 'Close')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="Open">Open</SelectItem>
-                  <SelectItem value="Close">Close</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Exit Type</Label>
-              <Select value={exitType} onValueChange={(v) => setExitType(v as 'Open' | 'Close')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="Open">Open</SelectItem>
-                  <SelectItem value="Close">Close</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Trade Type</Label>
-              <Select value={tradeType} onValueChange={(v) => setTradeType(v as 'Long' | 'Short')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="Long">Long</SelectItem>
-                  <SelectItem value="Short">Short</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Data Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-100">
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold text-slate-700">Date</th>
+              {data.columns?.map((col: string, idx: number) => (
+                <th key={idx} className="px-3 py-2 text-right font-semibold text-slate-700">{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.tableData?.slice(0, 10).map((row: any, idx: number) => (
+              <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="px-3 py-2">{row.date}</td>
+                {data.columns?.map((col: string, colIdx: number) => (
+                  <td key={colIdx} className="px-3 py-2 text-right">{row[col]}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
-      {isLoading ? (
-        <div className="flex justify-center py-20">
-          <Loading size="lg" />
-        </div>
-      ) : data?.data?.monthlyReturns ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Returns Matrix</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Year</th>
-                    {months.map(m => <th key={m}>{m}</th>)}
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(data.data.monthlyReturns).map(([year, monthData]: [string, any]) => (
-                    <tr key={year}>
-                      <td className="font-medium">{year}</td>
-                      {months.map(m => (
-                        <td key={m} className={cn(
-                          monthData[m] > 0 ? 'text-green-600' : monthData[m] < 0 ? 'text-red-600' : ''
-                        )}>
-                          {monthData[m] !== undefined ? formatPercentage(monthData[m]) : '-'}
-                        </td>
-                      ))}
-                      <td className={cn(
-                        'font-semibold',
-                        monthData.Total > 0 ? 'text-green-600' : monthData.Total < 0 ? 'text-red-600' : ''
-                      )}>
-                        {formatPercentage(monthData.Total || 0)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="py-20 text-center text-muted-foreground">
-            Configure your trade setup and click Analyze
-          </CardContent>
-        </Card>
-      )}
+// Trending Streak Section
+function TrendingStreakSection({ data }: { data: any }) {
+  if (!data) return <div className="text-center text-slate-500">No data available</div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold text-slate-800">Trending Days Streak</h3>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-100">
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold text-slate-700">Start Date</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">Start Close</th>
+              <th className="px-3 py-2 text-left font-semibold text-slate-700">End Date</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">End Close</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">Total Days</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">% Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data?.map((row: any, idx: number) => (
+              <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="px-3 py-2">{row.startDate}</td>
+                <td className="px-3 py-2 text-right">{row.startClose}</td>
+                <td className="px-3 py-2">{row.endDate}</td>
+                <td className="px-3 py-2 text-right">{row.endClose}</td>
+                <td className="px-3 py-2 text-right">{row.totalDays}</td>
+                <td className={cn(
+                  "px-3 py-2 text-right font-semibold",
+                  row.percentChange > 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {row.percentChange > 0 ? '+' : ''}{row.percentChange}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Momentum Ranking Section
+function MomentumRankingSection({ data }: { data: any }) {
+  if (!data) return <div className="text-center text-slate-500">No data available</div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold text-slate-800">Momentum Ranking</h3>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-100">
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold text-slate-700">Rank</th>
+              <th className="px-3 py-2 text-left font-semibold text-slate-700">Symbol</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">1 Day</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">1 Week</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">1 Month</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">Avg Rank</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data?.map((row: any, idx: number) => (
+              <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="px-3 py-2 font-semibold">{idx + 1}</td>
+                <td className="px-3 py-2 font-medium">{row.symbol}</td>
+                <td className="px-3 py-2 text-right">{row.rank1Day}</td>
+                <td className="px-3 py-2 text-right">{row.rank1Week}</td>
+                <td className="px-3 py-2 text-right">{row.rank1Month}</td>
+                <td className="px-3 py-2 text-right font-semibold">{row.avgRank}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Watchlist Analysis Section
+function WatchlistAnalysisSection({ data }: { data: any }) {
+  if (!data) return <div className="text-center text-slate-500">No data available</div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold text-slate-800">Watchlist Analysis</h3>
+      
+      {/* Bar chart placeholder */}
+      <div className="h-96 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-center">
+        <p className="text-slate-400">Watchlist Return Percentage Chart</p>
+      </div>
     </div>
   );
 }
