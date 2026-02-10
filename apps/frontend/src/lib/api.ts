@@ -135,6 +135,38 @@ export const analysisApi = {
 
   // Chart Data
   chart: (params: ChartParams) => api.post('/analysis/chart', params),
+
+  // Event Analysis
+  events: (params: EventAnalysisParams) => {
+    // Transform frontend params to backend format
+    const backendParams = {
+      symbol: params.symbol,
+      eventNames: params.eventName ? [params.eventName] : undefined,
+      eventCategories: params.eventCategory ? [params.eventCategory] : undefined,
+      country: params.country || 'INDIA',
+      startDate: params.startDate,
+      endDate: params.endDate,
+      windowConfig: {
+        daysBefore: params.windowBefore || 10,
+        daysAfter: params.windowAfter || 10,
+        includeEventDay: true
+      },
+      tradeConfig: {
+        entryType: params.entryPoint || 'T-1_CLOSE',
+        daysAfter: params.windowAfter || 10
+      },
+      filters: {
+        minOccurrences: params.minOccurrences || 3
+      }
+    };
+    return api.post('/analysis/events', backendParams);
+  },
+  eventCategories: () => api.get('/analysis/events/categories'),
+  eventNames: (params?: { category?: string; country?: string }) => 
+    api.get('/analysis/events/names', { params }),
+  eventOccurrences: (name: string, params?: { startDate?: string; endDate?: string }) => 
+    api.get(`/analysis/events/occurrences/${encodeURIComponent(name)}`, { params }),
+  eventCompare: (params: EventCompareParams) => api.post('/analysis/events/compare', params),
 };
 
 // Upload API
@@ -323,4 +355,25 @@ interface OutlierFilters {
   weeklyPercentageRange?: { enabled: boolean; min: number; max: number };
   monthlyPercentageRange?: { enabled: boolean; min: number; max: number };
   yearlyPercentageRange?: { enabled: boolean; min: number; max: number };
+}
+
+export interface EventAnalysisParams {
+  symbol: string;
+  eventName?: string;
+  eventCategory?: string;
+  country?: string;
+  startDate: string;
+  endDate: string;
+  windowBefore?: number;
+  windowAfter?: number;
+  entryPoint?: 'T-1_CLOSE' | 'T0_OPEN' | 'T0_CLOSE';
+  exitPoint?: string;
+  minOccurrences?: number;
+}
+
+export interface EventCompareParams {
+  symbol: string;
+  eventNames: string[];
+  startDate: string;
+  endDate: string;
 }

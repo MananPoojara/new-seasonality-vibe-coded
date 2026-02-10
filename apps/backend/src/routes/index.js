@@ -11,6 +11,7 @@ const analysisRoutes = require('./analysisRoutes');
 const uploadRoutes = require('./uploadRoutes');
 const filesRoutes = require('./filesRoutes');
 const specialDaysRoutes = require('./specialDays');
+const eventAnalysisRoutes = require('./eventAnalysisRoutes');
 
 // Health check
 router.get('/health', async (req, res) => {
@@ -48,6 +49,7 @@ router.get('/', (req, res) => {
       upload: '/api/upload',
       files: '/api/files',
       specialDays: '/api/special-days',
+      eventAnalysis: '/api/analysis/events',
     },
     documentation: '/api/docs',
   });
@@ -60,5 +62,6 @@ router.use('/analysis', analysisRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/files', filesRoutes);
 router.use('/special-days', specialDaysRoutes);
+router.use('/analysis/events', eventAnalysisRoutes);
 
 module.exports = router;
