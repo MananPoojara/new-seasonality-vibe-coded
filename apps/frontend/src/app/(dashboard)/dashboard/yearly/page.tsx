@@ -13,6 +13,8 @@ import { createChart, ColorType } from 'lightweight-charts';
 
 import { analysisApi } from '@/lib/api';
 import { useAnalysisStore } from '@/store/analysisStore';
+import { useChartSelectionStore } from '@/store/chartSelectionStore';
+import { CumulativeChartWithDragSelect } from '@/components/charts';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -32,6 +34,7 @@ const Loading = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => (
 
 export default function YearlyPage() {
   const { selectedSymbols, startDate, endDate, filters, chartScale } = useAnalysisStore();
+  const { timeRangeSelection, clearTimeRangeSelection } = useChartSelectionStore();
   const [yearType, setYearType] = useState<'calendar' | 'expiry'>('calendar');
   const [activeTab, setActiveTab] = useState('chart');
   const [filterOpen, setFilterOpen] = useState(true);
@@ -68,7 +71,7 @@ export default function YearlyPage() {
   }, [isResizing]);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['yearly-analysis', selectedSymbols, startDate, endDate, filters, yearType],
+    queryKey: ['yearly-analysis', selectedSymbols, startDate, endDate, filters, yearType, timeRangeSelection.startDate, timeRangeSelection.endDate],
     queryFn: async () => {
       console.log('Fetching yearly data for:', selectedSymbols[0], {
         startDate,
@@ -77,10 +80,14 @@ export default function YearlyPage() {
         filters
       });
       
+      const dateRange = timeRangeSelection.isActive 
+        ? { startDate: timeRangeSelection.startDate || startDate, endDate: timeRangeSelection.endDate || endDate }
+        : { startDate, endDate };
+      
       const response = await analysisApi.yearly({
         symbol: selectedSymbols[0],
-        startDate,
-        endDate,
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
         yearType,
         filters,
         chartScale,
@@ -267,6 +274,22 @@ export default function YearlyPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Selection indicator */}
+            {timeRangeSelection.isActive && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="text-xs font-semibold text-amber-700">
+                  📅 {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
+                </div>
+                <button
+                  onClick={clearTimeRangeSelection}
+                  className="text-amber-600 hover:text-amber-800 font-bold"
+                  title="Clear selection"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-500 font-semibold">1H</span>
               <span className="text-slate-500 font-semibold">1D</span>
@@ -419,9 +442,12 @@ export default function YearlyPage() {
                     className="h-full"
                   >
                     {activeTab === 'chart' ? (
-                      <CandlestickChart 
+                      <CumulativeChartWithDragSelect 
                         data={symbolData.tableData || symbolData.data || symbolData.chartData} 
                         chartScale={chartScale}
+                        onRangeSelected={(start, end) => {
+                          console.log('📊 Yearly - Range selected:', start, 'to', end);
+                        }}
                       />
                     ) : (
                       <SeasonalDataTable data={symbolData.tableData || symbolData.data || symbolData.chartData} />

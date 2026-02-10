@@ -31,7 +31,7 @@ app.use(helmet({
 
 // CORS configuration
 // CORS configuration - ALLOW ALL ORIGINS
-console.log('⚠️  CORS: Allowing ALL origins');
+console.log('CORS: Allowing ALL origins');
 
 app.use(cors({
   origin: true, // Allow all origins
@@ -71,7 +71,7 @@ app.use('/api', routes);
 if (config.nodeEnv === 'development' || config.nodeEnv === 'production') {
   const adminSetupRoutes = require('./routes/adminSetupRoutes');
   app.use('/api/admin-setup', adminSetupRoutes);
-  logger.warn('⚠️  Admin setup routes enabled - remember to remove after setup!');
+  logger.warn('Admin setup routes enabled - remember to remove after setup!');
 }
 
 // Root endpoint

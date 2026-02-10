@@ -13,6 +13,8 @@ import { createChart, ColorType } from 'lightweight-charts';
 
 import { analysisApi } from '@/lib/api';
 import { useAnalysisStore } from '@/store/analysisStore';
+import { useChartSelectionStore } from '@/store/chartSelectionStore';
+import { CumulativeChartWithDragSelect } from '@/components/charts';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -38,6 +40,7 @@ const Loading = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => (
 
 export default function DailyPage() {
   const { selectedSymbols, startDate, endDate, lastNDays, filters, chartScale } = useAnalysisStore();
+  const { timeRangeSelection, clearTimeRangeSelection } = useChartSelectionStore();
   const [activeTab, setActiveTab] = useState('chart');
   const [chartMode, setChartMode] = useState<'cumulative' | 'superimposed' | 'yearly-overlay'>('cumulative');
   const [filterOpen, setFilterOpen] = useState(true);
@@ -74,12 +77,16 @@ export default function DailyPage() {
   }, [isResizing]);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['daily-analysis', selectedSymbols, startDate, endDate, lastNDays, filters],
+    queryKey: ['daily-analysis', selectedSymbols, startDate, endDate, lastNDays, filters, timeRangeSelection.startDate, timeRangeSelection.endDate],
     queryFn: async () => {
+      const dateRange = timeRangeSelection.isActive 
+        ? { startDate: timeRangeSelection.startDate || startDate, endDate: timeRangeSelection.endDate || endDate }
+        : { startDate, endDate };
+      
       const response = await analysisApi.daily({
         symbol: selectedSymbols[0],
-        startDate,
-        endDate,
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
         lastNDays,
         filters,
         chartScale,
@@ -264,6 +271,22 @@ export default function DailyPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Selection indicator */}
+            {timeRangeSelection.isActive && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div className="text-xs font-semibold text-indigo-700">
+                  📅 {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
+                </div>
+                <button
+                  onClick={clearTimeRangeSelection}
+                  className="text-indigo-600 hover:text-indigo-800 font-bold"
+                  title="Clear selection"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-500 font-semibold">1H</span>
               <span className="text-indigo-600 font-bold">1D</span>
@@ -459,9 +482,12 @@ export default function DailyPage() {
                   >
                     {activeTab === 'chart' ? (
                       chartMode === 'cumulative' ? (
-                        <CumulativeChart 
+                        <CumulativeChartWithDragSelect 
                           data={symbolData.chartData} 
                           chartScale={chartScale}
+                          onRangeSelected={(start, end) => {
+                            console.log('📊 Daily - Range selected:', start, 'to', end);
+                          }}
                         />
                       ) : chartMode === 'superimposed' ? (
                         <SuperimposedChart 
