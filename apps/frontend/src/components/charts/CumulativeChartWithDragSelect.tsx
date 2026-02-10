@@ -23,7 +23,7 @@ export function CumulativeChartWithDragSelect({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
-  
+
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -32,7 +32,7 @@ export function CumulativeChartWithDragSelect({
     value: number;
   } | null>(null);
 
-  const { timeRangeSelection, setTimeRangeSelection, clearTimeRangeSelection } = 
+  const { timeRangeSelection, setTimeRangeSelection, clearTimeRangeSelection } =
     useChartSelectionStore();
 
   // Initialize drag select hook
@@ -170,14 +170,26 @@ export function CumulativeChartWithDragSelect({
       }
     };
 
+    // Listen to window resize
     window.addEventListener('resize', handleResize);
+
+    // Use ResizeObserver to detect container size changes (e.g., when sidebar closes)
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+
+    if (chartContainerRef.current) {
+      resizeObserver.observe(chartContainerRef.current);
+    }
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       chart.remove();
     };
   }, [data, chartScale]);
 
+  
   // Handle clear selection
   const handleClearSelection = () => {
     clearSelection();

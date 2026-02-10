@@ -2,8 +2,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Play, BarChart3, Activity, Filter, 
+import {
+  Play, BarChart3, Activity, Filter,
   ChevronDown, Download, ChevronLeft, ChevronRight,
   ArrowUpRight, ArrowDownRight, RefreshCw,
   Settings, LogOut, Zap, Calendar
@@ -17,8 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-import { 
-  SymbolSelector, 
+import {
+  SymbolSelector,
   DateRangePicker
 } from '@/components/filters';
 
@@ -90,7 +90,7 @@ export default function EventsPage() {
   const { data: eventNamesData } = useQuery({
     queryKey: ['event-names', selectedCategory, selectedCountry],
     queryFn: async () => {
-      const response = await analysisApi.eventNames({ 
+      const response = await analysisApi.eventNames({
         category: selectedCategory || undefined,
         country: selectedCountry || undefined
       });
@@ -104,10 +104,10 @@ export default function EventsPage() {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['event-analysis', selectedSymbols, startDate, endDate, selectedEventName, selectedCategory, windowBefore, windowAfter, entryPoint, exitPoint, minOccurrences, timeRangeSelection.startDate, timeRangeSelection.endDate],
     queryFn: async () => {
-      const dateRange = timeRangeSelection.isActive 
+      const dateRange = timeRangeSelection.isActive
         ? { startDate: timeRangeSelection.startDate || startDate, endDate: timeRangeSelection.endDate || endDate }
         : { startDate, endDate };
-      
+
       const response = await analysisApi.events({
         symbol: selectedSymbols[0],
         eventName: selectedEventName || undefined,
@@ -132,8 +132,8 @@ export default function EventsPage() {
   return (
     <div className="flex h-full bg-slate-50" style={{ userSelect: isResizing ? 'none' : 'auto' }}>
       {/* LEFT SIDEBAR - FILTER CONSOLE */}
-      <aside 
-        style={{ 
+      <aside
+        style={{
           width: filterOpen ? filterWidth : 0,
           transition: isResizing ? 'none' : 'width 0.3s ease-out'
         }}
@@ -144,7 +144,7 @@ export default function EventsPage() {
             <Filter className="h-4 w-4 text-violet-600" />
             <h2 className="font-bold text-sm text-slate-700 uppercase tracking-wider">Event Filters</h2>
           </div>
-          <button 
+          <button
             onClick={() => setFilterOpen(false)}
             className="p-1 hover:bg-slate-100 rounded"
           >
@@ -302,8 +302,8 @@ export default function EventsPage() {
 
         {/* Apply Filters Button */}
         <div className="flex-shrink-0 p-3 border-t border-slate-100">
-          <Button 
-            onClick={() => refetch()} 
+          <Button
+            onClick={() => refetch()}
             disabled={isFetching || selectedSymbols.length === 0 || (!selectedEventName && !selectedCategory)}
             className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-lg"
           >
@@ -341,7 +341,7 @@ export default function EventsPage() {
         <header className="flex-shrink-0 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4">
           <div className="flex items-center gap-4">
             {!filterOpen && (
-              <button 
+              <button
                 onClick={() => setFilterOpen(true)}
                 className="p-2 hover:bg-slate-100 rounded"
               >
@@ -375,17 +375,17 @@ export default function EventsPage() {
                 </button>
               </div>
             )}
-            
+
             {/* User Profile Section */}
             <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-200">
               <button
-                onClick={() => {/* Add settings navigation */}}
+                onClick={() => {/* Add settings navigation */ }}
                 className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
                 title="Settings"
               >
                 <Settings className="h-4 w-4" />
               </button>
-              
+
               <button
                 onClick={() => {
                   if (typeof window !== 'undefined') {
@@ -433,8 +433,8 @@ export default function EventsPage() {
                 value={(stats.sharpeRatio || 0).toFixed(2)}
                 subtitle={
                   stats.sharpeRatio > 2 ? 'Excellent' :
-                  stats.sharpeRatio > 1 ? 'Good' :
-                  stats.sharpeRatio > 0 ? 'Fair' : 'Poor'
+                    stats.sharpeRatio > 1 ? 'Good' :
+                      stats.sharpeRatio > 0 ? 'Fair' : 'Poor'
                 }
                 trend={(stats.sharpeRatio || 0) > 0 ? 'up' : 'down'}
               />
@@ -461,8 +461,8 @@ export default function EventsPage() {
                   onClick={() => setActiveTab('chart')}
                   className={cn(
                     "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
-                    activeTab === 'chart' 
-                      ? "bg-violet-50 text-violet-600" 
+                    activeTab === 'chart'
+                      ? "bg-violet-50 text-violet-600"
                       : "text-slate-500 hover:text-slate-700"
                   )}
                 >
@@ -472,8 +472,8 @@ export default function EventsPage() {
                   onClick={() => setActiveTab('table')}
                   className={cn(
                     "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
-                    activeTab === 'table' 
-                      ? "bg-violet-50 text-violet-600" 
+                    activeTab === 'table'
+                      ? "bg-violet-50 text-violet-600"
                       : "text-slate-500 hover:text-slate-700"
                   )}
                 >
@@ -486,10 +486,10 @@ export default function EventsPage() {
             <div className={cn("flex-1 p-4", activeTab === 'data' ? 'overflow-visible' : 'overflow-hidden')}>
               <AnimatePresence mode="wait">
                 {isLoading ? (
-                  <motion.div 
+                  <motion.div
                     key="loading"
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="h-full flex flex-col items-center justify-center"
                   >
@@ -497,9 +497,9 @@ export default function EventsPage() {
                     <p className="mt-4 text-sm text-slate-500">Analyzing events...</p>
                   </motion.div>
                 ) : !data || !selectedEventName && !selectedCategory ? (
-                  <motion.div 
+                  <motion.div
                     key="empty"
-                    initial={{ opacity: 0 }} 
+                    initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="h-full flex flex-col items-center justify-center"
                   >
@@ -508,18 +508,18 @@ export default function EventsPage() {
                     <p className="text-sm text-slate-500 mt-2">Choose an event or category to analyze</p>
                   </motion.div>
                 ) : (
-                  <motion.div 
+                  <motion.div
                     key="content"
-                    initial={{ opacity: 0 }} 
+                    initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="h-full"
                   >
                     {activeTab === 'chart' ? (
-                      <CumulativeChartWithDragSelect 
-                        data={chartData} 
+                      <CumulativeChartWithDragSelect
+                        data={chartData}
                         chartScale={chartScale}
                         onRangeSelected={(start, end) => {
-                          console.log('📊 Events - Range selected:', start, 'to', end);
+                          console.log('Events - Range selected:', start, 'to', end);
                         }}
                       />
                     ) : (
@@ -573,7 +573,7 @@ function FilterSection({ title, children, defaultOpen = false }: {
   defaultOpen?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  
+
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
       <button

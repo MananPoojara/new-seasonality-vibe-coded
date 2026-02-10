@@ -1,3 +1,22 @@
+Option 1: Use the Safe SQL Migration (Recommended)
+cd apps/backend
+
+# Run the safe SQL migration directly
+psql $DATABASE_URL -f prisma/migrations/add_google_oauth_safe/migration.sql
+
+# Then regenerate Prisma client
+npx prisma generate
+Option 2: Use Prisma Migrate with Force Flag
+
+
+cd apps/backend
+
+# This applies the migration without the scary warning
+npx prisma db push
+
+
+
+
 # Google OAuth Setup Guide
 
 ## Overview
@@ -15,6 +34,9 @@ Google OAuth has been integrated into your login and signup pages. Follow these 
 ## Setup Steps (When You're Ready)
 
 ### Step 1: Get Google OAuth Credentials
+
+
+
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing one
