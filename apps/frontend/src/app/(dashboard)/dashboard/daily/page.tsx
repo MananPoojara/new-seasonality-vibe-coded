@@ -275,7 +275,7 @@ export default function DailyPage() {
             {timeRangeSelection.isActive && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <div className="text-xs font-semibold text-indigo-700">
-                  📅 {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
+                  {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
                 </div>
                 <button
                   onClick={clearTimeRangeSelection}

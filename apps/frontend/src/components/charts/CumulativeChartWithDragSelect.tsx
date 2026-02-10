@@ -23,7 +23,7 @@ export function CumulativeChartWithDragSelect({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
-
+  
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -32,7 +32,7 @@ export function CumulativeChartWithDragSelect({
     value: number;
   } | null>(null);
 
-  const { timeRangeSelection, setTimeRangeSelection, clearTimeRangeSelection } =
+  const { timeRangeSelection, setTimeRangeSelection, clearTimeRangeSelection } = 
     useChartSelectionStore();
 
   // Initialize drag select hook
@@ -127,14 +127,40 @@ export function CumulativeChartWithDragSelect({
 
     seriesRef.current = areaSeries;
 
-    const chartData = data.map((d: any) => ({
-      time: Math.floor(new Date(d.date).getTime() / 1000) as any,
-      value: d.cumulative || 0,
-      originalDate: d.date,
-    }));
+    // Check if this is event data (has relativeDay) or regular date data
+    const isEventData = data.length > 0 && data[0].relativeDay !== undefined;
+    
+    const chartData = isEventData 
+      ? data.map((d: any, index: number) => ({
+          time: index as any, // Use index as time for event data
+          value: d.cumulative || 0,
+          originalDate: d.date,
+          relativeDay: d.relativeDay,
+        }))
+      : data.map((d: any) => ({
+          time: Math.floor(new Date(d.date).getTime() / 1000) as any,
+          value: d.cumulative || 0,
+          originalDate: d.date,
+        }));
 
     areaSeries.setData(chartData);
     chart.timeScale().fitContent();
+
+    // For event data, customize time scale to show relative days
+    if (isEventData) {
+      chart.timeScale().applyOptions({
+        // @ts-ignore - tickMarkFormatter exists but not in types
+        tickMarkFormatter: (time: any) => {
+          const index = Math.floor(time);
+          if (index >= 0 && index < chartData.length) {
+            const relDay = (chartData[index] as any).relativeDay;
+            if (relDay === 0) return '0';
+            return relDay > 0 ? `+${relDay}` : `${relDay}`;
+          }
+          return '';
+        },
+      });
+    }
 
     // Tooltip handler
     chart.subscribeCrosshairMove((param: any) => {
@@ -145,11 +171,14 @@ export function CumulativeChartWithDragSelect({
 
       const dataPoint = param.seriesData.get(areaSeries);
       if (dataPoint) {
-        const dateStr = new Date(param.time * 1000).toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        });
+        // For event data, show relative day label; for regular data, show date
+        const dateStr = isEventData
+          ? chartData[param.time]?.originalDate || `Day ${param.time}`
+          : new Date(param.time * 1000).toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            });
 
         setTooltip({
           visible: true,
@@ -170,26 +199,67 @@ export function CumulativeChartWithDragSelect({
       }
     };
 
-    // Listen to window resize
     window.addEventListener('resize', handleResize);
 
-    // Use ResizeObserver to detect container size changes (e.g., when sidebar closes)
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize();
-    });
-
-    if (chartContainerRef.current) {
-      resizeObserver.observe(chartContainerRef.current);
+    // Draw T0 vertical line overlay for event data
+    if (isEventData && chartContainerRef.current) {
+      const t0Index = chartData.findIndex((d: any) => d.relativeDay === 0);
+      
+      if (t0Index !== -1) {
+        const canvas = document.createElement('canvas');
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '10';
+        canvas.width = chartContainerRef.current.clientWidth;
+        canvas.height = chartContainerRef.current.clientHeight;
+        
+        chartContainerRef.current.appendChild(canvas);
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const drawT0Line = () => {
+            const timeScale = chart.timeScale();
+            const x = timeScale.timeToCoordinate(t0Index as any);
+            
+            if (x !== null) {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              
+              // Draw vertical line
+              ctx.strokeStyle = '#9900ffff';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(x, 0);
+              ctx.lineTo(x, canvas.height);
+              ctx.stroke();
+              
+              // Draw label
+              ctx.fillStyle = '#DC2626';
+              ctx.font = 'bold 20px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.fillText('',x, 10);
+            }
+          };
+          
+          drawT0Line();
+          
+          // Redraw on scroll/zoom
+          chart.timeScale().subscribeVisibleLogicalRangeChange(drawT0Line);
+          
+          return () => {
+            canvas.remove();
+          };
+        }
+      }
     }
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      resizeObserver.disconnect();
       chart.remove();
     };
   }, [data, chartScale]);
 
-  
   // Handle clear selection
   const handleClearSelection = () => {
     clearSelection();

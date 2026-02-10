@@ -280,7 +280,7 @@ export default function WeeklyPage() {
             {timeRangeSelection.isActive && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
                 <div className="text-xs font-semibold text-emerald-700">
-                  📅 {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
+                  {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
                 </div>
                 <button
                   onClick={clearTimeRangeSelection}

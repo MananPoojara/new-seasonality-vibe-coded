@@ -81,7 +81,8 @@ export default function EventsPage() {
       const response = await analysisApi.eventCategories();
       // Extract unique categories from the response
       const categories = response.data.data || [];
-      const uniqueCategories = [...new Set(categories.map((c: any) => c.category))];
+      const categoryNames = categories.map((c: any) => c.category);
+      const uniqueCategories = Array.from(new Set(categoryNames)) as string[];
       return uniqueCategories;
     },
   });
@@ -101,7 +102,7 @@ export default function EventsPage() {
   });
 
   // Fetch event analysis
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, refetch, isFetching, error } = useQuery({
     queryKey: ['event-analysis', selectedSymbols, startDate, endDate, selectedEventName, selectedCategory, windowBefore, windowAfter, entryPoint, exitPoint, minOccurrences, timeRangeSelection.startDate, timeRangeSelection.endDate],
     queryFn: async () => {
       const dateRange = timeRangeSelection.isActive
@@ -124,10 +125,22 @@ export default function EventsPage() {
       return response.data.data;
     },
     enabled: selectedSymbols.length > 0 && (!!selectedEventName || !!selectedCategory),
+    retry: false, // Don't retry on insufficient data errors
   });
 
-  const stats = data?.statistics;
-  const chartData = data?.averageEventCurve || [];
+  const stats = data?.aggregatedMetrics;
+  
+  // Transform averageEventCurve data for chart (relativeDay -> date format)
+  const chartData = useMemo(() => {
+    if (!data?.averageEventCurve) return [];
+    
+    return data.averageEventCurve.map((point: any) => ({
+      date: `T${point.relativeDay >= 0 ? '+' : ''}${point.relativeDay}`, // e.g., "T-10", "T0", "T+5"
+      returnPercentage: point.avgReturn || 0,
+      cumulative: point.avgReturn || 0, // For event analysis, we show average return
+      relativeDay: point.relativeDay,
+    }));
+  }, [data?.averageEventCurve]);
 
   return (
     <div className="flex h-full bg-slate-50" style={{ userSelect: isResizing ? 'none' : 'auto' }}>
@@ -189,15 +202,15 @@ export default function EventsPage() {
 
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1 block">Category</label>
-                <Select value={selectedCategory} onValueChange={(val) => {
-                  setSelectedCategory(val);
-                  setSelectedEventName(''); // Reset event name when category changes
+                <Select value={selectedCategory || undefined} onValueChange={(val) => {
+                  setSelectedCategory(val === 'ALL_CATEGORIES' ? '' : val);
+                  setSelectedEventName('');
                 }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="ALL_CATEGORIES">All Categories</SelectItem>
                     {categoriesData?.map((cat: string) => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
@@ -207,12 +220,14 @@ export default function EventsPage() {
 
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1 block">Event Name</label>
-                <Select value={selectedEventName} onValueChange={setSelectedEventName}>
+                <Select value={selectedEventName || undefined} onValueChange={(val) => {
+                  setSelectedEventName(val === 'ALL_EVENTS' ? '' : val);
+                }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select event" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Events</SelectItem>
+                    <SelectItem value="ALL_EVENTS">All Events</SelectItem>
                     {eventNamesData?.map((name: string) => (
                       <SelectItem key={name} value={name}>{name}</SelectItem>
                     ))}
@@ -364,7 +379,7 @@ export default function EventsPage() {
             {timeRangeSelection.isActive && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-violet-50 border border-violet-200 rounded-lg">
                 <div className="text-xs font-semibold text-violet-700">
-                  📅 {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
+                  {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
                 </div>
                 <button
                   onClick={clearTimeRangeSelection}
@@ -495,6 +510,35 @@ export default function EventsPage() {
                   >
                     <Loading size="lg" />
                     <p className="mt-4 text-sm text-slate-500">Analyzing events...</p>
+                  </motion.div>
+                ) : error ? (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="h-full flex flex-col items-center justify-center"
+                  >
+                    <div className="text-center max-w-md">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                        <span className="text-3xl">⚠️</span>
+                      </div>
+                      <h3 className="text-lg font-semibold text-slate-700 mb-2">Analysis Error</h3>
+                      <p className="text-sm text-slate-600 mb-4">
+                        {(error as any)?.response?.data?.error?.message || 
+                         (error as any)?.message || 
+                         'Failed to analyze events'}
+                      </p>
+                      <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                        <p className="font-semibold mb-1">Suggestions:</p>
+                        <ul className="text-left space-y-1">
+                          <li>• Try selecting a different event</li>
+                          <li>• Expand your date range to include more years</li>
+                          <li>• Reduce the minimum occurrences requirement</li>
+                          <li>• Check if the event exists in your database</li>
+                        </ul>
+                      </div>
+                    </div>
                   </motion.div>
                 ) : !data || !selectedEventName && !selectedCategory ? (
                   <motion.div

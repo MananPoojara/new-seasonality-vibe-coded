@@ -278,7 +278,7 @@ export default function YearlyPage() {
             {timeRangeSelection.isActive && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="text-xs font-semibold text-amber-700">
-                  📅 {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
+                  {timeRangeSelection.startDate} → {timeRangeSelection.endDate}
                 </div>
                 <button
                   onClick={clearTimeRangeSelection}

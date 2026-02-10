@@ -6,14 +6,16 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const prisma = require('../utils/prisma');
 const { logger } = require('../utils/logger');
 
-// Configure Google OAuth Strategy
-passport.use(
-    new GoogleStrategy(
-        {
-            clientID: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3001/api/auth/google/callback',
-        },
+// Only configure Google OAuth if credentials are provided
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    // Configure Google OAuth Strategy
+    passport.use(
+        new GoogleStrategy(
+            {
+                clientID: process.env.GOOGLE_CLIENT_ID,
+                clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://192.168.4.30:3001/api/auth/google/callback',
+            },
         async (accessToken, refreshToken, profile, done) => {
             try {
                 logger.info('Google OAuth callback received', { profileId: profile.id });
@@ -71,6 +73,11 @@ passport.use(
         }
     )
 );
+
+    logger.info('Google OAuth strategy configured');
+} else {
+    logger.warn('Google OAuth not configured - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET not set');
+}
 
 // Serialize user for session
 passport.serializeUser((user, done) => {

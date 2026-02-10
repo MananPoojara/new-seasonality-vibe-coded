@@ -145,7 +145,6 @@ class AuthService {
           isActive: true,
           subscriptionTier: true,
           subscriptionExpiry: true,
-          googleId: true,
         },
       });
 
@@ -163,10 +162,10 @@ class AuthService {
         throw new AuthenticationError('Account is deactivated. Please contact support.');
       }
 
-      // Check if user registered with Google OAuth (no password)
-      if (user.googleId && !user.password) {
-        logger.warn('Login failed: OAuth user trying password login', { email });
-        throw new AuthenticationError('Please sign in with Google');
+      // Check if user has a password (skip OAuth check since googleId doesn't exist yet)
+      if (!user.password) {
+        logger.warn('Login failed: User has no password set', { email });
+        throw new AuthenticationError('Please contact support to set up your password');
       }
 
       logger.info('Verifying password', { email });
