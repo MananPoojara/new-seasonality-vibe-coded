@@ -1,2 +1,15 @@
 export { CumulativeChartWithDragSelect } from './CumulativeChartWithDragSelect';
 export { DragSelectOverlay } from './DragSelectOverlay';
+export { ReturnBarChart } from './ReturnBarChart';
+export { AggregateChart } from './AggregateChart';
+export { CandlestickChart } from './CandlestickChart';
+export { ConsecutiveTrendChart } from './ConsecutiveTrendChart';
+export { HeatmapChart } from './HeatmapChart';
+export { MonthlyReturnsMatrix } from './MonthlyReturnsMatrix';
+export { SeasonalityChart } from './SeasonalityChart';
+export { StatisticsCard } from './StatisticsCard';
+export { StatisticsPanel } from './StatisticsPanel';
+export { SuperimposedChart } from './SuperimposedChart';
+export { AdvancedDataTable } from './AdvancedDataTable';
+export { DataTable } from './DataTable';
+export { ChartWrapper } from './ChartWrapper';

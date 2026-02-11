@@ -13,7 +13,7 @@ console.log('API Configuration:', {
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // Reduced to 30 seconds for auth requests
+  timeout: 120000, // Increased to 120 seconds for slow backend responses
   headers: {
     'Content-Type': 'application/json',
   },
@@ -29,9 +29,9 @@ api.interceptors.request.use(
       fullURL: `${config.baseURL}${config.url}`,
       timeout: config.timeout
     });
-    
-    const token = typeof window !== 'undefined' 
-      ? localStorage.getItem('accessToken') 
+
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('accessToken')
       : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -62,11 +62,11 @@ api.interceptors.response.use(
       url: error.config?.url,
       code: error.code
     });
-    
+
     if (error.response?.status === 401) {
       // Don't auto-redirect for /auth/me - let checkAuth handle it
       const isAuthMeRequest = error.config?.url?.includes('/auth/me');
-      
+
       if (!isAuthMeRequest && typeof window !== 'undefined') {
         // Token expired - redirect to login for other requests
         localStorage.removeItem('accessToken');
@@ -103,7 +103,7 @@ export const analysisApi = {
 
   // Daily Analysis
   daily: (params: DailyAnalysisParams) => api.post('/analysis/daily', params),
-  dailyAggregate: (params: DailyAnalysisParams) => 
+  dailyAggregate: (params: DailyAnalysisParams) =>
     api.post('/analysis/daily/aggregate', params),
 
   // Weekly Analysis
@@ -162,9 +162,9 @@ export const analysisApi = {
     return api.post('/analysis/events', backendParams);
   },
   eventCategories: () => api.get('/analysis/events/categories'),
-  eventNames: (params?: { category?: string; country?: string }) => 
+  eventNames: (params?: { category?: string; country?: string }) =>
     api.get('/analysis/events/names', { params }),
-  eventOccurrences: (name: string, params?: { startDate?: string; endDate?: string }) => 
+  eventOccurrences: (name: string, params?: { startDate?: string; endDate?: string }) =>
     api.get(`/analysis/events/occurrences/${encodeURIComponent(name)}`, { params }),
   eventCompare: (params: EventCompareParams) => api.post('/analysis/events/compare', params),
 };
@@ -180,7 +180,7 @@ export const uploadApi = {
   getBatch: (batchId: string) => api.get(`/upload/batches/${batchId}`),
   processBatch: (batchId: string) => api.post(`/upload/batches/${batchId}/process`),
   deleteBatch: (batchId: string) => api.delete(`/upload/batches/${batchId}`),
-  
+
   // Bulk upload (for large file batches)
   getPresignedUrls: (files: { name: string; size: number }[]) =>
     api.post('/upload/bulk/presign', { files }),
@@ -188,7 +188,7 @@ export const uploadApi = {
     api.post('/upload/bulk/process', { batchId, objectKeys, fileNames }),
   getBulkStatus: (batchId: string) => api.get(`/upload/bulk/${batchId}/status`),
   retryBulk: (batchId: string) => api.post(`/upload/bulk/${batchId}/retry`),
-  
+
   // Stats
   getStats: () => api.get('/upload/stats'),
 };
