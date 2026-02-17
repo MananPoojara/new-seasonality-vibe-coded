@@ -9,6 +9,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
+const passport = require('./config/passport');
 
 const config = require('./config');
 const routes = require('./routes');
@@ -30,13 +31,25 @@ app.use(helmet({
 }));
 
 // CORS configuration
+// CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
+console.log('CORS allowed origins:', allowedOrigins);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-  credentials: true,
-  maxAge: 86400, // 24 hours
+  origin: allowedOrigins,
+  credentials: true, // Allow cookies/credentials
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
 }));
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Initialize Passport
+app.use(passport.initialize());
 
 // Compression
 app.use(compression());
@@ -63,6 +76,13 @@ app.set('trust proxy', 1);
 // API routes
 app.use('/api', routes);
 
+// TEMPORARY: Admin setup routes (remove after setting up admin users)
+if (config.nodeEnv === 'development' || config.nodeEnv === 'production') {
+  const adminSetupRoutes = require('./routes/adminSetupRoutes');
+  app.use('/api/admin-setup', adminSetupRoutes);
+  logger.warn('Admin setup routes enabled - remember to remove after setup!');
+}
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -86,11 +106,7 @@ app.use(errorHandler);
 
 const startServer = async () => {
   try {
-    // Test database connection
-    await prisma.$connect();
-    logger.info('Database connected');
-
-    // Start server
+    // Start server FIRST (non-blocking)
     const server = app.listen(config.port, () => {
       logger.info(`Server started`, {
         port: config.port,
@@ -110,16 +126,21 @@ const startServer = async () => {
       `);
     });
 
+    // Connect to database in BACKGROUND (non-blocking)
+    prisma.$connect()
+      .then(() => logger.info('Database connected'))
+      .catch((err) => logger.error('Database connection failed', { error: err.message }));
+
     // Graceful shutdown
     const shutdown = async (signal) => {
       logger.info(`${signal} received, shutting down gracefully`);
-      
+
       server.close(async () => {
         logger.info('HTTP server closed');
-        
+
         await prisma.$disconnect();
         logger.info('Database disconnected');
-        
+
         process.exit(0);
       });
 

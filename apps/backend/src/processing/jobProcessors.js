@@ -56,6 +56,16 @@ async function processCSVJob(job) {
       data: { status: 'PROCESSING' },
     });
 
+    // Update batch with current file info
+    const fileName = objectKey.split('/').pop();
+    await prisma.uploadBatch.update({
+      where: { id: batchId },
+      data: { currentFile: fileName },
+    });
+
+    // Report initial progress
+    await job.updateProgress(2);
+
     // Download file from MinIO
     const stream = await minioClient.getObject(config.minio.bucket, objectKey);
     const chunks = [];
@@ -65,20 +75,40 @@ async function processCSVJob(job) {
     }
     
     const fileBuffer = Buffer.concat(chunks);
-    const fileName = objectKey.split('/').pop();
 
-    // Process CSV
+    // Report download complete
+    await job.updateProgress(5);
+
+    // Process CSV with progress callback
     const processor = new CSVProcessor({
       batchSize: options.batchSize || 1000,
       calculateDerived: options.calculateDerived !== false,
     });
 
+    // Progress callback to update job progress AND batch current file status
+    const onProgress = async (percent, message) => {
+      // Scale progress: 5% (download) + 95% (processing)
+      const scaledProgress = 5 + Math.round(percent * 0.95);
+      await job.updateProgress(scaledProgress);
+      
+      // Update batch with current progress message for frontend polling
+      await prisma.uploadBatch.update({
+        where: { id: batchId },
+        data: { 
+          currentFile: `${fileName} (${scaledProgress}%) - ${message}` 
+        },
+      });
+      
+      logger.info('Processing progress', { jobId: job.id, percent: scaledProgress, message });
+    };
+
     const result = await processor.processUploadedFile(fileBuffer, fileName, {
       ...options,
-      generateCalculatedData: true // Enable calculated data storage in DB
+      generateCalculatedData: true,
+      onProgress // Pass progress callback
     });
 
-    // Update progress
+    // Update progress to 100%
     await job.updateProgress(100);
 
     // Update file status

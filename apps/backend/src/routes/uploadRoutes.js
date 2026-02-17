@@ -394,7 +394,8 @@ router.post('/batches/:batchId/process',
           fileName: file.originalName,
           options: {
             batchSize: 1000,
-            calculateDerived: false, // Phase 1: just OHLCV data
+            calculateDerived: true, // Generate calculated data in Phase 2 tables
+            generateCalculatedData: true, // Store in MondayWeekly, ExpiryWeekly, Monthly, Yearly tables
           },
         });
         
@@ -605,7 +606,8 @@ router.post('/bulk/process',
           fileIndex: i,
           options: {
             batchSize: 1000,
-            calculateDerived: false,
+            calculateDerived: true, // Generate calculated data in Phase 2 tables
+            generateCalculatedData: true, // Store in MondayWeekly, ExpiryWeekly, Monthly, Yearly tables
           },
         });
       }
@@ -673,6 +675,7 @@ router.get('/bulk/:batchId/status',
           failedFiles: batch.failedFiles,
           pendingFiles: batch.totalFiles - completedFiles,
           progress,
+          currentFile: batch.currentFile, // Current file being processed with progress
           files: batch.files.map(f => ({
             id: f.id,
             fileName: f.originalName,
@@ -757,7 +760,8 @@ router.post('/bulk/:batchId/retry',
           retry: true,
           options: {
             batchSize: 1000,
-            calculateDerived: false,
+            calculateDerived: true, // Generate calculated data in Phase 2 tables
+            generateCalculatedData: true, // Store in MondayWeekly, ExpiryWeekly, Monthly, Yearly tables
           },
         });
       }

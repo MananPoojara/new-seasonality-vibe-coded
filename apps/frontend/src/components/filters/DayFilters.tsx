@@ -23,7 +23,7 @@ export function DayFilters() {
     <div className="filter-section">
       <h3 className="text-lg font-semibold text-primary mb-4">Daily Filters</h3>
       
-      <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-col gap-4">
         <div className="space-y-2">
           <Label>Positive/Negative Days</Label>
           <Select
@@ -33,7 +33,7 @@ export function DayFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Days</SelectItem>
               <SelectItem value="Positive">Positive Days only</SelectItem>
               <SelectItem value="Negative">Negative Days only</SelectItem>
@@ -65,7 +65,7 @@ export function DayFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Days</SelectItem>
               <SelectItem value="Even">Even Days only</SelectItem>
               <SelectItem value="Odd">Odd Days only</SelectItem>
@@ -82,7 +82,7 @@ export function DayFilters() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               <SelectItem value="All">All Days</SelectItem>
               <SelectItem value="Even">Even Days only</SelectItem>
               <SelectItem value="Odd">Odd Days only</SelectItem>

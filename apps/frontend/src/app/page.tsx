@@ -1,23 +1,30 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { LoadingPage } from '@/components/ui/loading';
-import { Button } from '@/components/ui/button';
+import { LoadingOverlay } from '@/components/ui/loading';
+import {Button}  from '@/components/ui/button';
 import { BarChart3, TrendingUp, Calendar, Search } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, user, checkAuth } = useAuthStore();
+  const [isChecking, setIsChecking] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    checkAuth();
+    const check = async () => {
+      await checkAuth();
+      setIsChecking(false);
+    };
+    check();
   }, [checkAuth]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isChecking) {
+      setIsRedirecting(true);
       // Redirect admin users to admin panel, others to dashboard
       if (user?.role === 'admin') {
         router.push('/admin');
@@ -25,7 +32,12 @@ export default function HomePage() {
         router.push('/dashboard/daily');
       }
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, isChecking]);
+
+  // Show loading while checking auth or redirecting
+  if (isChecking || isRedirecting) {
+    return <LoadingOverlay isVisible={true} text={isRedirecting ? "Redirecting..." : "Loading..."} />;
+  }
 
   const features = [
     { icon: Calendar, title: 'Daily Analysis', desc: '40+ filters for daily seasonality patterns' },

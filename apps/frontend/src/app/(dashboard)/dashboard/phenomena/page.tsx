@@ -62,7 +62,7 @@ export default function PhenomenaPage() {
               <Label>Phenomena Type</Label>
               <Select value={phenomenaType} onValueChange={(v) => setPhenomenaType(v as 'consecutive' | 'reversal' | 'breakout')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="consecutive">Consecutive Days</SelectItem>
                   <SelectItem value="reversal">Reversal Patterns</SelectItem>
                   <SelectItem value="breakout">Breakout Patterns</SelectItem>

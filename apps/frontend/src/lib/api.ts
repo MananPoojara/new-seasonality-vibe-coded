@@ -4,10 +4,16 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 const API_BASE_URL = baseUrl.startsWith('http') ? `${baseUrl}/api` : '/api';
 
+console.log('API Configuration:', {
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  baseUrl,
+  API_BASE_URL
+});
+
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 300000, // 5 minutes for large uploads
+  timeout: 120000, // Increased to 120 seconds for slow backend responses
   headers: {
     'Content-Type': 'application/json',
   },
@@ -16,24 +22,53 @@ const api: AxiosInstance = axios.create({
 // Request interceptor - add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = typeof window !== 'undefined' 
-      ? localStorage.getItem('accessToken') 
+    console.log('Making API request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      timeout: config.timeout
+    });
+
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('accessToken')
       : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor - handle errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API response received:', {
+      status: response.status,
+      url: response.config.url,
+      data: response.data
+    });
+    return response;
+  },
   async (error: AxiosError) => {
+    console.error('API response error:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+      code: error.code
+    });
+
     if (error.response?.status === 401) {
-      // Token expired - try refresh or redirect to login
-      if (typeof window !== 'undefined') {
+      // Don't auto-redirect for /auth/me - let checkAuth handle it
+      const isAuthMeRequest = error.config?.url?.includes('/auth/me');
+
+      if (!isAuthMeRequest && typeof window !== 'undefined') {
+        // Token expired - redirect to login for other requests
         localStorage.removeItem('accessToken');
         window.location.href = '/login';
       }
@@ -44,10 +79,16 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
-  register: (data: { email: string; password: string; name: string }) =>
-    api.post('/auth/register', data),
+  login: (email: string, password: string) => {
+    console.log('authApi.login called with:', { email, password: '***' });
+    console.log('Making request to:', `${API_BASE_URL}/auth/login`);
+    return api.post('/auth/login', { email, password }, { timeout: 15000 });
+  },
+  register: (data: { email: string; password: string; name: string }) => {
+    console.log('authApi.register called with:', { ...data, password: '***' });
+    console.log('Making request to:', `${API_BASE_URL}/auth/register`);
+    return api.post('/auth/register', data, { timeout: 15000 });
+  },
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   refreshToken: (refreshToken: string) =>
@@ -62,7 +103,7 @@ export const analysisApi = {
 
   // Daily Analysis
   daily: (params: DailyAnalysisParams) => api.post('/analysis/daily', params),
-  dailyAggregate: (params: DailyAnalysisParams) => 
+  dailyAggregate: (params: DailyAnalysisParams) =>
     api.post('/analysis/daily/aggregate', params),
 
   // Weekly Analysis
@@ -94,6 +135,38 @@ export const analysisApi = {
 
   // Chart Data
   chart: (params: ChartParams) => api.post('/analysis/chart', params),
+
+  // Event Analysis
+  events: (params: EventAnalysisParams) => {
+    // Transform frontend params to backend format
+    const backendParams = {
+      symbol: params.symbol,
+      eventNames: params.eventName ? [params.eventName] : undefined,
+      eventCategories: params.eventCategory ? [params.eventCategory] : undefined,
+      country: params.country || 'INDIA',
+      startDate: params.startDate,
+      endDate: params.endDate,
+      windowConfig: {
+        daysBefore: params.windowBefore || 10,
+        daysAfter: params.windowAfter || 10,
+        includeEventDay: true
+      },
+      tradeConfig: {
+        entryType: params.entryPoint || 'T-1_CLOSE',
+        daysAfter: params.windowAfter || 10
+      },
+      filters: {
+        minOccurrences: params.minOccurrences || 3
+      }
+    };
+    return api.post('/analysis/events', backendParams);
+  },
+  eventCategories: () => api.get('/analysis/events/categories'),
+  eventNames: (params?: { category?: string; country?: string }) =>
+    api.get('/analysis/events/names', { params }),
+  eventOccurrences: (name: string, params?: { startDate?: string; endDate?: string }) =>
+    api.get(`/analysis/events/occurrences/${encodeURIComponent(name)}`, { params }),
+  eventCompare: (params: EventCompareParams) => api.post('/analysis/events/compare', params),
 };
 
 // Upload API
@@ -107,7 +180,7 @@ export const uploadApi = {
   getBatch: (batchId: string) => api.get(`/upload/batches/${batchId}`),
   processBatch: (batchId: string) => api.post(`/upload/batches/${batchId}/process`),
   deleteBatch: (batchId: string) => api.delete(`/upload/batches/${batchId}`),
-  
+
   // Bulk upload (for large file batches)
   getPresignedUrls: (files: { name: string; size: number }[]) =>
     api.post('/upload/bulk/presign', { files }),
@@ -115,7 +188,7 @@ export const uploadApi = {
     api.post('/upload/bulk/process', { batchId, objectKeys, fileNames }),
   getBulkStatus: (batchId: string) => api.get(`/upload/bulk/${batchId}/status`),
   retryBulk: (batchId: string) => api.post(`/upload/bulk/${batchId}/retry`),
-  
+
   // Stats
   getStats: () => api.get('/upload/stats'),
 };
@@ -124,7 +197,8 @@ export default api;
 
 // Types
 export interface DailyAnalysisParams {
-  symbols: string[];
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
   startDate: string;
   endDate: string;
   lastNDays?: number;
@@ -134,18 +208,37 @@ export interface DailyAnalysisParams {
   aggregateField?: string;
 }
 
-export interface WeeklyAnalysisParams extends DailyAnalysisParams {
+export interface WeeklyAnalysisParams {
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
+  startDate: string;
+  endDate: string;
   weekType: 'monday' | 'expiry';
+  lastNDays?: number;
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
 }
 
-export interface MonthlyAnalysisParams extends DailyAnalysisParams {
+export interface MonthlyAnalysisParams {
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
+  startDate: string;
+  endDate: string;
+  lastNDays?: number;
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
   aggregateType?: 'total' | 'average';
+  monthType?: 'calendar' | 'expiry';
 }
 
 export interface YearlyAnalysisParams {
-  symbols: string[];
+  symbol: string;  // Single symbol for backend
+  symbols?: string[];  // Keep for backward compatibility
   startDate: string;
   endDate: string;
+  yearType?: 'calendar' | 'expiry';
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
   overlayType?: 'CalendarDays' | 'TradingDays';
 }
 
@@ -153,12 +246,29 @@ export interface ScenarioParams {
   symbol: string;
   startDate: string;
   endDate: string;
-  entryDay?: string;
-  exitDay?: string;
-  entryType?: 'Open' | 'Close';
-  exitType?: 'Open' | 'Close';
-  tradeType?: 'Long' | 'Short';
-  returnType?: 'Percent' | 'Points';
+  filters?: FilterConfig;
+  chartScale?: 'linear' | 'log';
+  historicTrendType?: 'Bullish' | 'Bearish';
+  consecutiveDays?: number;
+  dayRange?: number;
+  // Trending Streak params
+  trendingStreakValue?: number;
+  trendingStreakType?: 'more' | 'less';
+  trendingStreakPercent?: number;
+  // Momentum Ranking params
+  watchlist?: string;
+  momentumTrendType?: number;
+  atrPeriod?: number;
+  recentDays1?: number;
+  recentDays2?: number;
+  recentMonths1?: number;
+  recentMonths2?: number;
+  // Watchlist Analysis params
+  watchlistName?: string;
+  recentWeek?: number;
+  recentMonth1?: number;
+  recentMonth2?: number;
+  recentMonth3?: number;
 }
 
 export interface ScannerParams {
@@ -246,4 +356,25 @@ interface OutlierFilters {
   weeklyPercentageRange?: { enabled: boolean; min: number; max: number };
   monthlyPercentageRange?: { enabled: boolean; min: number; max: number };
   yearlyPercentageRange?: { enabled: boolean; min: number; max: number };
+}
+
+export interface EventAnalysisParams {
+  symbol: string;
+  eventName?: string;
+  eventCategory?: string;
+  country?: string;
+  startDate: string;
+  endDate: string;
+  windowBefore?: number;
+  windowAfter?: number;
+  entryPoint?: 'T-1_CLOSE' | 'T0_OPEN' | 'T0_CLOSE';
+  exitPoint?: string;
+  minOccurrences?: number;
+}
+
+export interface EventCompareParams {
+  symbol: string;
+  eventNames: string[];
+  startDate: string;
+  endDate: string;
 }

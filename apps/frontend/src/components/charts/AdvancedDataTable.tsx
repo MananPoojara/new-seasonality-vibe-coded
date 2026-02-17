@@ -220,7 +220,7 @@ export function AdvancedDataTable<T extends Record<string, unknown>>({
               <SelectTrigger className="w-20 h-8">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white">
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="20">20</SelectItem>
                 <SelectItem value="50">50</SelectItem>

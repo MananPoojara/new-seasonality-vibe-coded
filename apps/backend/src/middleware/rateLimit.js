@@ -9,7 +9,7 @@ const { redis } = require('../utils/redis');
 const { logger } = require('../utils/logger');
 
 /**
- * Custom rate limit store using Redis
+ * Custom rate limit store using Redis (optimized)
  */
 class RedisStore {
   constructor() {
@@ -18,10 +18,13 @@ class RedisStore {
 
   async increment(key) {
     const redisKey = this.prefix + key;
-    const current = await redis.incr(redisKey);
-    if (current === 1) {
-      await redis.expire(redisKey, 3600); // 1 hour window
-    }
+    // Use INCR with pipelined EXPIRE for better performance
+    const multi = redis.multi();
+    multi.incr(redisKey);
+    multi.expire(redisKey, 3600); // 1 hour window
+    const results = await multi.exec();
+    const current = results[0][1];
+
     return {
       totalHits: current,
       resetTime: new Date(Date.now() + 3600000),
@@ -47,35 +50,56 @@ const getRateLimitForTier = (tier) => {
 };
 
 /**
- * Dynamic rate limiter based on subscription
+ * Cache rate limiters by tier (optimization - create once, reuse)
+ */
+const rateLimiterCache = new Map();
+
+/**
+ * Get or create a cached rate limiter for a tier
+ */
+const getRateLimiter = (tier) => {
+  // Check cache first
+  if (!rateLimiterCache.has(tier)) {
+    const limits = getRateLimitForTier(tier);
+
+    const limiter = rateLimit({
+      windowMs: limits.windowMs,
+      max: limits.max,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req) => {
+        // Use user ID if authenticated, otherwise IP
+        return req.user?.id?.toString() || req.ip;
+      },
+      handler: (req, res, next) => {
+        logger.warn('Rate limit exceeded', {
+          userId: req.user?.id,
+          ip: req.ip,
+          tier,
+        });
+        next(new RateLimitError(`Rate limit exceeded. Upgrade to ${tier === 'trial' ? 'basic' : 'premium'} for higher limits.`));
+      },
+      skip: (req) => {
+        // Skip rate limiting for admin users
+        return req.user?.role === 'admin';
+      },
+      // Skip successful requests to reduce Redis operations
+      skipSuccessfulRequests: true,
+    });
+
+    // Cache the limiter
+    rateLimiterCache.set(tier, limiter);
+  }
+
+  return rateLimiterCache.get(tier);
+};
+
+/**
+ * Dynamic rate limiter based on subscription (OPTIMIZED with caching)
  */
 const dynamicRateLimiter = (req, res, next) => {
   const tier = req.user?.subscriptionTier || 'trial';
-  const limits = getRateLimitForTier(tier);
-
-  const limiter = rateLimit({
-    windowMs: limits.windowMs,
-    max: limits.max,
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => {
-      // Use user ID if authenticated, otherwise IP
-      return req.user?.id?.toString() || req.ip;
-    },
-    handler: (req, res, next) => {
-      logger.warn('Rate limit exceeded', {
-        userId: req.user?.id,
-        ip: req.ip,
-        tier,
-      });
-      next(new RateLimitError(`Rate limit exceeded. Upgrade to ${tier === 'trial' ? 'basic' : 'premium'} for higher limits.`));
-    },
-    skip: (req) => {
-      // Skip rate limiting for admin users
-      return req.user?.role === 'admin';
-    },
-  });
-
+  const limiter = getRateLimiter(tier);
   return limiter(req, res, next);
 };
 

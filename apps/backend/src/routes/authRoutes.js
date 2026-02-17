@@ -7,8 +7,10 @@ const router = express.Router();
 const AuthService = require('../services/AuthService');
 const { authenticateToken } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
+const { strictRateLimiter } = require('../middleware/rateLimit');
 const { z } = require('zod');
 const { logger } = require('../utils/logger');
+const passport = require('../config/passport');
 
 // Validation schemas (flat - not nested in body)
 const registerSchema = z.object({
@@ -36,17 +38,53 @@ const updateProfileSchema = z.object({
 // =====================================================
 
 /**
+ * GET /auth/test
+ * Test auth endpoint
+ */
+router.get('/test', async (req, res) => {
+  try {
+    // Test database connection
+    const testQuery = await require('../utils/prisma').$queryRaw`SELECT 1 as test`;
+
+    res.json({
+      success: true,
+      message: 'Auth service is working',
+      database: 'connected',
+      testQuery,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Auth service error',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
  * POST /auth/register
  * Register a new user
  */
-router.post('/register', validate(registerSchema), async (req, res, next) => {
+router.post('/register', strictRateLimiter, validate(registerSchema), async (req, res, next) => {
   try {
+    console.log('Registration request received:', {
+      body: { ...req.body, password: '***' },
+      headers: req.headers,
+      ip: req.ip
+    });
+
     const result = await AuthService.register(req.body);
+
+    console.log('Registration successful, sending response');
+
     res.status(201).json({
       success: true,
       ...result,
     });
   } catch (error) {
+    console.error('Registration error in route:', error);
     next(error);
   }
 });
@@ -55,18 +93,28 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
  * POST /auth/login
  * Login user
  */
-router.post('/login', validate(loginSchema), async (req, res, next) => {
+router.post('/login', strictRateLimiter, validate(loginSchema), async (req, res, next) => {
   try {
+    console.log('Login request received:', {
+      body: { ...req.body, password: '***' },
+      headers: req.headers,
+      ip: req.ip
+    });
+
     const { email, password } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'];
 
     const result = await AuthService.login(email, password, ipAddress, userAgent);
+
+    console.log('Login successful, sending response');
+
     res.json({
       success: true,
       ...result,
     });
   } catch (error) {
+    console.error('Login error in route:', error);
     next(error);
   }
 });
@@ -78,7 +126,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 router.post('/refresh', async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
-    
+
     if (!refreshToken) {
       return res.status(400).json({
         success: false,
@@ -100,10 +148,10 @@ router.post('/refresh', async (req, res, next) => {
  * POST /auth/forgot-password
  * Request password reset
  */
-router.post('/forgot-password', async (req, res, next) => {
+router.post('/forgot-password', strictRateLimiter, async (req, res, next) => {
   try {
     const { email } = req.body;
-    
+
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -125,10 +173,10 @@ router.post('/forgot-password', async (req, res, next) => {
  * POST /auth/reset-password
  * Reset password with token
  */
-router.post('/reset-password', async (req, res, next) => {
+router.post('/reset-password', strictRateLimiter, async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
-    
+
     if (!token || !newPassword) {
       return res.status(400).json({
         success: false,
@@ -145,6 +193,47 @@ router.post('/reset-password', async (req, res, next) => {
     next(error);
   }
 });
+
+/**
+ * GET /auth/google
+ * Initiate Google OAuth flow
+ */
+router.get('/google',
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false
+  })
+);
+
+/**
+ * GET /auth/google/callback
+ * Google OAuth callback
+ */
+router.get('/google/callback',
+  passport.authenticate('google', {
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_failed`
+  }),
+  async (req, res) => {
+    try {
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+
+      // Generate tokens for the authenticated user
+      const result = await AuthService.googleAuth(req.user, ipAddress, userAgent);
+
+      // Redirect to frontend with tokens
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${result.accessToken}&refreshToken=${result.refreshToken}`;
+
+      res.redirect(redirectUrl);
+    } catch (error) {
+      logger.error('Google OAuth callback error:', error);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      res.redirect(`${frontendUrl}/login?error=oauth_error`);
+    }
+  }
+);
 
 // =====================================================
 // PROTECTED ROUTES
@@ -223,7 +312,7 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
 router.get('/permissions', authenticateToken, async (req, res, next) => {
   try {
     const PermissionService = require('../services/PermissionService');
-    
+
     const permissions = PermissionService.getUserPermissions(req.user);
     const features = PermissionService.getUserFeatures(req.user);
     const limits = PermissionService.getTierLimits(req.user.subscriptionTier);

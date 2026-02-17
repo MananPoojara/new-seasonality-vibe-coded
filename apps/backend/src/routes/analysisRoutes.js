@@ -13,7 +13,8 @@ const router = express.Router();
 const prisma = require('../utils/prisma');
 const { logger } = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
-const { NotFoundError, ValidationError } = require('../utils/errors');
+const { NotFoundError } = require('../utils/errors');
+const AnalysisService = require('../services/AnalysisService');
 
 /**
  * GET /analysis/symbols
@@ -29,12 +30,16 @@ router.get('/symbols',
           id: true,
           symbol: true,
           name: true,
+          sector: true,
+          exchange: true,
+          currency: true,
           totalRecords: true,
           firstDataDate: true,
           lastDataDate: true,
           lastUpdated: true,
           _count: {
             select: {
+              seasonalityData: true,
               dailySeasonalityData: true,
               mondayWeeklyData: true,
               expiryWeeklyData: true,
@@ -48,20 +53,27 @@ router.get('/symbols',
 
       res.json({
         success: true,
-        data: symbols.map(ticker => ({
+        count: symbols.length,
+        symbols: symbols.map(ticker => ({
           id: ticker.id,
           symbol: ticker.symbol,
           name: ticker.name,
+          sector: ticker.sector,
+          exchange: ticker.exchange,
+          currency: ticker.currency,
           totalRecords: ticker.totalRecords,
           firstDataDate: ticker.firstDataDate,
           lastDataDate: ticker.lastDataDate,
           lastUpdated: ticker.lastUpdated,
+          hasData: ticker._count.seasonalityData > 0 ||
+                   ticker._count.dailySeasonalityData > 0,
           dataAvailable: {
-            daily: ticker._count.dailySeasonalityData,
-            mondayWeekly: ticker._count.mondayWeeklyData,
-            expiryWeekly: ticker._count.expiryWeeklyData,
-            monthly: ticker._count.monthlySeasonalityData,
-            yearly: ticker._count.yearlySeasonalityData
+            basic: ticker._count.seasonalityData > 0,
+            daily: ticker._count.dailySeasonalityData > 0,
+            mondayWeekly: ticker._count.mondayWeeklyData > 0,
+            expiryWeekly: ticker._count.expiryWeeklyData > 0,
+            monthly: ticker._count.monthlySeasonalityData > 0,
+            yearly: ticker._count.yearlySeasonalityData > 0
           }
         }))
       });
@@ -155,7 +167,7 @@ router.get('/symbols/:symbol/monday-weekly',
         success: true,
         data: {
           symbol: ticker.symbol,
-          timeframe: 'mondayWeekly',
+          timeframe: 'monday-weekly',
           records,
           pagination: {
             total,
@@ -205,7 +217,7 @@ router.get('/symbols/:symbol/expiry-weekly',
         success: true,
         data: {
           symbol: ticker.symbol,
-          timeframe: 'expiryWeekly',
+          timeframe: 'expiry-weekly',
           records,
           pagination: {
             total,
@@ -755,6 +767,277 @@ router.get('/symbols/:symbol/yearly/export',
       res.setHeader('Content-Disposition', `attachment; filename="${symbol}_yearly.csv"`);
       res.send(csv);
     } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================
+// POST ANALYSIS ENDPOINTS - Filtered Analysis with Statistics
+// =====================================================
+
+/**
+ * POST /analysis/daily
+ * Daily analysis with filters
+ * 
+ * Request body:
+ * {
+ *   "symbol": "NIFTY",
+ *   "startDate": "2016-01-01",
+ *   "endDate": "2025-12-31",
+ *   "lastNDays": 0,
+ *   "weekType": "expiry",
+ *   "filters": {
+ *     "yearFilters": { ... },
+ *     "monthFilters": { ... },
+ *     "weekFilters": { ... },
+ *     "dayFilters": { ... },
+ *     "outlierFilters": { ... }
+ *   }
+ * }
+ */
+router.post('/daily',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol, ...params } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      logger.info(`Daily analysis request for ${symbol}`, { params });
+
+      const result = await AnalysisService.dailyAnalysis(symbol, params);
+
+      res.json({
+        success: true,
+        data: {
+          [symbol]: result
+        }
+      });
+    } catch (error) {
+      logger.error('Daily analysis error', { error: error.message });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /analysis/daily/aggregate
+ * Daily aggregate analysis (by weekday, calendar day, etc.)
+ * 
+ * Additional params:
+ * - aggregateField: "weekday" | "CalenderYearDay" | "TradingYearDay" | "CalenderMonthDay" | "TradingMonthDay" | "MonthNumber"
+ * - aggregateType: "total" | "avg" | "max" | "min"
+ */
+router.post('/daily/aggregate',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol, ...params } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      logger.info(`Daily aggregate analysis request for ${symbol}`, { params });
+
+      const result = await AnalysisService.dailyAggregateAnalysis(symbol, params);
+
+      res.json({
+        success: true,
+        data: {
+          [symbol]: result
+        }
+      });
+    } catch (error) {
+      logger.error('Daily aggregate analysis error', { error: error.message });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /analysis/weekly
+ * Weekly analysis (Monday or Expiry based on weekType)
+ * 
+ * Request body:
+ * {
+ *   "symbol": "NIFTY",
+ *   "weekType": "expiry" | "monday",
+ *   "startDate": "2016-01-01",
+ *   "endDate": "2025-12-31",
+ *   "filters": { ... }
+ * }
+ */
+router.post('/weekly',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol, ...params } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      logger.info(`Weekly analysis request for ${symbol}`, { weekType: params.weekType });
+
+      const result = await AnalysisService.weeklyAnalysis(symbol, params);
+
+      res.json({
+        success: true,
+        data: {
+          [symbol]: result
+        }
+      });
+    } catch (error) {
+      logger.error('Weekly analysis error', { error: error.message });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /analysis/monthly
+ * Monthly analysis with filters
+ */
+router.post('/monthly',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol, ...params } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      logger.info(`Monthly analysis request for ${symbol}`);
+
+      const result = await AnalysisService.monthlyAnalysis(symbol, params);
+
+      res.json({
+        success: true,
+        data: {
+          [symbol]: result
+        }
+      });
+    } catch (error) {
+      logger.error('Monthly analysis error', { error: error.message });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /analysis/yearly
+ * Yearly analysis with filters
+ */
+router.post('/yearly',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol, ...params } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      logger.info(`Yearly analysis request for ${symbol}`);
+
+      const result = await AnalysisService.yearlyAnalysis(symbol, params);
+
+      res.json({
+        success: true,
+        data: {
+          [symbol]: result
+        }
+      });
+    } catch (error) {
+      logger.error('Yearly analysis error', { error: error.message });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /analysis/scenario
+ * Scenario analysis with multiple outputs:
+ * - Historic Trending Days
+ * - Trending Streak
+ * - Momentum Ranking
+ * - Watchlist Analysis
+ */
+router.post('/scenario',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol, ...params } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      logger.info(`Scenario analysis request for ${symbol}`);
+
+      const result = await AnalysisService.scenarioAnalysis(symbol, params);
+
+      res.json({
+        success: true,
+        data: {
+          [symbol]: result
+        }
+      });
+    } catch (error) {
+      logger.error('Scenario analysis error', { error: error.message });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /analysis/cache/clear
+ * Clear cache for a symbol (admin only)
+ */
+router.post('/cache/clear',
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { symbol } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({
+          success: false,
+          error: 'Symbol is required'
+        });
+      }
+
+      await AnalysisService.clearSymbolCache(symbol);
+
+      res.json({
+        success: true,
+        message: `Cache cleared for ${symbol}`
+      });
+    } catch (error) {
+      logger.error('Cache clear error', { error: error.message });
       next(error);
     }
   }

@@ -16,7 +16,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install all dependencies
-RUN npm ci
+RUN npm ci --no-audit --progress=false --fetch-retries=5 --fetch-timeout=600000
 
 # Generate Prisma client - schema.prisma has binaryTargets configured
 RUN npx prisma generate

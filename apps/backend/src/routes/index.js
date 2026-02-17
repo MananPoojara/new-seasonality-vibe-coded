@@ -10,14 +10,30 @@ const userRoutes = require('./userRoutes');
 const analysisRoutes = require('./analysisRoutes');
 const uploadRoutes = require('./uploadRoutes');
 const filesRoutes = require('./filesRoutes');
+const specialDaysRoutes = require('./specialDays');
+const eventAnalysisRoutes = require('./eventAnalysisRoutes');
 
 // Health check
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+router.get('/health', async (req, res) => {
+  try {
+    // Test database connection
+    await require('../utils/prisma').$queryRaw`SELECT 1`;
+
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'connected',
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'disconnected',
+      error: error.message,
+    });
+  }
 });
 
 // API info
@@ -32,6 +48,8 @@ router.get('/', (req, res) => {
       analysis: '/api/analysis',
       upload: '/api/upload',
       files: '/api/files',
+      specialDays: '/api/special-days',
+      eventAnalysis: '/api/analysis/events',
     },
     documentation: '/api/docs',
   });
@@ -43,5 +61,7 @@ router.use('/users', userRoutes);
 router.use('/analysis', analysisRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/files', filesRoutes);
+router.use('/special-days', specialDaysRoutes);
+router.use('/analysis/events', eventAnalysisRoutes);
 
 module.exports = router;

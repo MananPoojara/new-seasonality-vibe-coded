@@ -10,8 +10,13 @@ const { AuthenticationError, AuthorizationError } = require('../utils/errors');
 const { logger } = require('../utils/logger');
 
 // Simple in-memory cache for user data (5 minute TTL)
+// Use Redis in production for better scalability
 const userCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// API key cache (separate from user cache for API keys)
+const apiKeyCache = new Map();
+const API_KEY_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Get user from cache or database
@@ -19,7 +24,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const getCachedUser = async (userId) => {
   const cacheKey = `user:${userId}`;
   const cached = userCache.get(cacheKey);
-  
+
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.user;
   }
@@ -91,17 +96,47 @@ const authenticateToken = async (req, res, next) => {
 };
 
 /**
- * Authenticate using API key
+ * Authenticate using API key (OPTIMIZED with caching)
  */
 const authenticateApiKey = async (req, res, next, apiKey) => {
   try {
-    // Hash the API key to compare with stored hash
-    const keyHash = await bcrypt.hash(apiKey, 10);
-    
-    // Find API key (we store hashed keys, so we need to check all active keys)
+    // Create a hash of the API key for cache lookup (SHA-256 for speed)
+    const crypto = require('crypto');
+    const apiKeyCacheKey = `apikey:${crypto.createHash('sha256').update(apiKey).digest('hex')}`;
+
+    // Check cache first
+    const cached = apiKeyCache.get(apiKeyCacheKey);
+    if (cached && Date.now() - cached.timestamp < API_KEY_CACHE_TTL) {
+      req.user = cached.user;
+      req.apiKey = cached.apiKeyData;
+
+      // Update usage in background (non-blocking)
+      prisma.apiKey.update({
+        where: { id: cached.apiKeyData.id },
+        data: {
+          usageToday: { increment: 1 },
+          totalUsage: { increment: 1 },
+          lastUsed: new Date(),
+        },
+      }).catch(err => {
+        // Don't throw or log - this is just metrics
+      });
+
+      return next();
+    }
+
+    // Cache miss - query database
     const apiKeys = await prisma.apiKey.findMany({
       where: { isActive: true },
-      include: {
+      select: {
+        id: true,
+        keyHash: true,
+        userId: true,
+        permissions: true,
+        rateLimit: true,
+        usageToday: true,
+        totalUsage: true,
+        expiresAt: true,
         user: {
           select: {
             id: true,
@@ -114,9 +149,11 @@ const authenticateApiKey = async (req, res, next, apiKey) => {
           },
         },
       },
+      take: 100, // Limit results to prevent massive queries
     });
 
     let matchedKey = null;
+    // Find matching key
     for (const key of apiKeys) {
       if (await bcrypt.compare(apiKey, key.keyHash)) {
         matchedKey = key;
@@ -136,21 +173,43 @@ const authenticateApiKey = async (req, res, next, apiKey) => {
       throw new AuthenticationError('User account inactive');
     }
 
-    // Update API key usage
-    await prisma.apiKey.update({
+    const apiKeyData = {
+      id: matchedKey.id,
+      usageToday: matchedKey.usageToday,
+      totalUsage: matchedKey.totalUsage,
+      rateLimit: matchedKey.rateLimit,
+      expiresAt: matchedKey.expiresAt,
+    };
+
+    // Cache the result
+    apiKeyCache.set(apiKeyCacheKey, {
+      user: matchedKey.user,
+      apiKeyData,
+      timestamp: Date.now(),
+    });
+
+    // Update usage in background (non-blocking)
+    prisma.apiKey.update({
       where: { id: matchedKey.id },
       data: {
         usageToday: { increment: 1 },
         totalUsage: { increment: 1 },
         lastUsed: new Date(),
       },
+    }).catch(err => {
+      // Don't throw or log - this is just metrics
     });
 
     req.user = matchedKey.user;
-    req.apiKey = matchedKey;
+    req.apiKey = apiKeyData;
     next();
   } catch (error) {
-    next(error);
+    if (error instanceof AuthenticationError) {
+      next(error);
+    } else {
+      logger.error('API key authentication error:', { error: error.message });
+      next(error);
+    }
   }
 };
 
