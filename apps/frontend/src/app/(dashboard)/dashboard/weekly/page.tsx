@@ -15,6 +15,7 @@ import { analysisApi } from '@/lib/api';
 import { useAnalysisStore } from '@/store/analysisStore';
 import { useChartSelectionStore } from '@/store/chartSelectionStore';
 import { CumulativeChartWithDragSelect, ReturnBarChart } from '@/components/charts';
+import { WeeklyDataTable } from '@/components/charts/WeeklyDataTable';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -256,6 +257,56 @@ export default function WeeklyPage() {
   const symbolData = data?.[selectedSymbols[0]];
   const stats = symbolData?.statistics;
 
+  // Transform raw table data into weekly statistics format
+  const weeklyStatisticsData = useMemo(() => {
+    if (!symbolData?.tableData || symbolData.tableData.length === 0) return [];
+
+    const tableData = symbolData.tableData;
+    const weekGroups: Record<number, number[]> = {};
+
+    // Group returns by week number
+    tableData.forEach((d: any) => {
+      const weekNum = d.weekNumberYearly || d.weekNumberMonthly || 0;
+      if (!weekGroups[weekNum]) weekGroups[weekNum] = [];
+      weekGroups[weekNum].push(d.returnPercentage || 0);
+    });
+
+    // Calculate statistics for each week
+    return Object.entries(weekGroups).map(([week, returns]) => {
+      const weekNum = parseInt(week);
+      const allCount = returns.length;
+      const avgReturnAll = returns.reduce((a, b) => a + b, 0) / allCount;
+      const sumReturnAll = returns.reduce((a, b) => a + b, 0);
+
+      const positiveReturns = returns.filter((r) => r > 0);
+      const negativeReturns = returns.filter((r) => r <= 0);
+
+      const posCount = positiveReturns.length;
+      const negCount = negativeReturns.length;
+
+      const avgReturnPos = posCount > 0 ? positiveReturns.reduce((a, b) => a + b, 0) / posCount : 0;
+      const avgReturnNeg = negCount > 0 ? negativeReturns.reduce((a, b) => a + b, 0) / negCount : 0;
+
+      const sumReturnPos = positiveReturns.reduce((a, b) => a + b, 0);
+      const sumReturnNeg = negativeReturns.reduce((a, b) => a + b, 0);
+
+      return {
+        week: weekNum,
+        allCount,
+        avgReturnAll,
+        sumReturnAll,
+        posCount,
+        posAccuracy: allCount > 0 ? (posCount / allCount) * 100 : 0,
+        avgReturnPos,
+        sumReturnPos,
+        negCount,
+        negAccuracy: allCount > 0 ? (negCount / allCount) * 100 : 0,
+        avgReturnNeg,
+        sumReturnNeg,
+      };
+    }).sort((a, b) => a.week - b.week);
+  }, [symbolData?.tableData]);
+
   return (
     <div className="flex h-full bg-[#F8F9FB]">
       {/* Main Content Area */}
@@ -467,6 +518,16 @@ export default function WeeklyPage() {
                 )}
               </div>
             </div>
+          </motion.div>
+
+          {/* DATA TABLE */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.35 }}
+            className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+          >
+            <WeeklyDataTable data={weeklyStatisticsData} title={`${selectedSymbols[0] || 'Symbol'} - Weekly Statistics`} />
           </motion.div>
         </div>
       </div>

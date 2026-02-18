@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import { 
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
   SlidersHorizontal,
   ChevronRight,
   Play,
@@ -33,15 +32,31 @@ export function RightFilterConsole({
   subtitle = "Configure Analysis",
   primaryColor = "#f59e0b"
 }: RightFilterConsoleProps) {
-  const [filterWidth] = useState(320);
+  const [filterWidth, setFilterWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
   const consoleRef = useRef<HTMLDivElement>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Trigger resize for charts - fires AFTER sidebar animation completes
+  const triggerChartResize = useCallback(() => {
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+    }
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    // Wait for sidebar animation to complete (350ms) then fire resize
+    resizeTimeoutRef.current = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 400); // Slightly longer than animation duration
+  }, []);
 
   const handleToggle = () => {
     onToggle();
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-    }, 100);
+    triggerChartResize();
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -50,13 +65,10 @@ export function RightFilterConsole({
     e.stopPropagation();
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isResizing || !consoleRef.current) return;
-  };
-
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsResizing(false);
-  };
+    triggerChartResize();
+  }, [triggerChartResize]);
 
   useEffect(() => {
     if (isResizing) {
@@ -69,94 +81,125 @@ export function RightFilterConsole({
         document.body.style.userSelect = '';
       };
     }
-  }, [isResizing]);
+  }, [isResizing, handleMouseUp]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   return (
     <>
-      {/* Floating Toggle Button - CSS only */}
-      <AnimatePresence>
-        {!isOpen && (
-          <button
-            onClick={handleToggle}
-            className="fixed right-6 top-24 z-50 flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-lg hover:shadow-xl transition-shadow"
-          >
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
-              style={{ 
-                background: `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColor(primaryColor, -20)} 100%)`,
-              }}
-            >
-              <SlidersHorizontal className="h-5 w-5" />
-            </div>
-            <div className="flex flex-col items-start pr-2">
-              <span className="text-sm font-bold text-slate-800">{title}</span>
-              <span className="text-[10px] text-slate-400 font-medium">Open console</span>
-            </div>
-            <ChevronRight className="h-4 w-4 text-slate-400" />
-          </button>
-        )}
-      </AnimatePresence>
+      {/* Floating Toggle Button - Smooth slide animation */}
+      <button
+        onClick={handleToggle}
+        className="fixed right-6 top-24 z-50 flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 ease-out"
+        style={{
+          transform: isOpen ? 'translateX(calc(100% + 100px))' : 'translateX(0)',
+          opacity: isOpen ? 0 : 1,
+          pointerEvents: isOpen ? 'none' : 'auto',
+          transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <div 
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0"
+          style={{ 
+            background: `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColor(primaryColor, -20)} 100%)`,
+          }}
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+        </div>
+        <div className="flex flex-col items-start pr-2">
+          <span className="text-sm font-bold text-slate-800">{title}</span>
+          <span className="text-[10px] text-slate-400 font-medium">Open console</span>
+        </div>
+        <ChevronRight className="h-4 w-4 text-slate-400 flex-shrink-0" />
+      </button>
 
-      {/* Right Filter Console - No animation */}
+      {/* Right Filter Console - Ultra smooth width transition */}
       <aside
         ref={consoleRef}
-        style={{ 
-          width: isOpen ? filterWidth : 0,
-          boxShadow: isOpen ? '-4px 0 24px rgba(0,0,0,0.04)' : 'none'
-        }}
         className={cn(
           "h-full bg-white border-l border-slate-200 flex flex-col overflow-hidden relative flex-shrink-0",
           isResizing && "select-none"
         )}
+        style={{
+          width: isOpen ? filterWidth : 0,
+          opacity: isOpen ? 1 : 0,
+          transition: isResizing 
+            ? 'none' 
+            : 'width 350ms cubic-bezier(0.4, 0, 0.2, 1), opacity 250ms ease 100ms',
+          // Use contain to prevent layout thrashing
+          contain: 'layout style paint',
+        }}
       >
-        {/* Header */}
-        <div className={cn(
-          "flex-shrink-0 h-16 border-b border-slate-100 flex items-center justify-between px-5 bg-gradient-to-br from-white via-white to-slate-50/50",
-          !isOpen && "opacity-0 pointer-events-none"
-        )}>
+        {/* Header - Fade in with slight delay */}
+        <div 
+          className="flex-shrink-0 h-16 border-b border-slate-100 flex items-center justify-between px-5 bg-gradient-to-br from-white via-white to-slate-50/50"
+          style={{
+            opacity: isOpen ? 1 : 0,
+            transform: isOpen ? 'translateX(0)' : 'translateX(20px)',
+            transition: isResizing 
+              ? 'none' 
+              : 'opacity 300ms ease 150ms, transform 350ms cubic-bezier(0.4, 0, 0.2, 1) 100ms',
+          }}
+        >
           <div className="flex items-center gap-3">
             <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md flex-shrink-0"
               style={{ 
                 background: `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColor(primaryColor, -20)} 100%)`,
               }}
             >
               <Settings2 className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="font-bold text-sm text-slate-800">{title}</h2>
-              <p className="text-[10px] text-slate-400 font-medium">{subtitle}</p>
+            <div className="min-w-0">
+              <h2 className="font-bold text-sm text-slate-800 truncate">{title}</h2>
+              <p className="text-[10px] text-slate-400 font-medium truncate">{subtitle}</p>
             </div>
           </div>
           
           <button
             onClick={handleToggle}
-            className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-xl transition-colors flex-shrink-0"
             title="Hide filters"
           >
             <X className="h-4 w-4 text-slate-400 hover:text-slate-600 transition-colors" />
           </button>
         </div>
 
-        {/* Filter Content */}
-        <div className={cn(
-          "flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent",
-          !isOpen && "opacity-0 pointer-events-none"
-        )}>
+        {/* Filter Content - Fade in after sidebar opens */}
+        <div 
+          className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+          style={{
+            opacity: isOpen ? 1 : 0,
+            transition: isResizing ? 'none' : 'opacity 250ms ease 200ms',
+          }}
+        >
           <div className="p-5 space-y-4">
             {children}
           </div>
         </div>
 
         {/* Apply Button Footer */}
-        <div className={cn(
-          "flex-shrink-0 p-5 border-t border-slate-100 bg-gradient-to-t from-slate-50/80 to-white",
-          !isOpen && "opacity-0 pointer-events-none"
-        )}>
+        <div 
+          className="flex-shrink-0 p-5 border-t border-slate-100 bg-gradient-to-t from-slate-50/80 to-white"
+          style={{
+            opacity: isOpen ? 1 : 0,
+            transition: isResizing ? 'none' : 'opacity 250ms ease 250ms',
+          }}
+        >
           <button
             onClick={onApply}
             disabled={isLoading}
-            className="w-full rounded-xl font-semibold py-3.5 px-4 shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full rounded-xl font-semibold py-3.5 px-4 shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             style={{ 
               background: `linear-gradient(135deg, ${primaryColor} 0%, ${adjustColor(primaryColor, -20)} 100%)`,
             }}
@@ -230,20 +273,20 @@ export function FilterSection({
           )}
         </div>
         <div 
-          className="transition-transform duration-200"
-          style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+          style={{ 
+            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
         >
           <ChevronRight className="h-4 w-4 text-slate-400" />
         </div>
       </button>
       
-      <AnimatePresence>
-        {isOpen && (
-          <div className="p-4 space-y-3">
-            {children}
-          </div>
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <div className="p-4 space-y-3">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

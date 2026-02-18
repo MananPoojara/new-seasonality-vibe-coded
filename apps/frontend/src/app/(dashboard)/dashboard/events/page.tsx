@@ -20,6 +20,7 @@ import { useAnalysisStore } from '@/store/analysisStore';
 import { useChartSelectionStore } from '@/store/chartSelectionStore';
 import { CumulativeChartWithDragSelect, ReturnBarChart } from '@/components/charts';
 import { AnalyticsMatrix } from '@/components/analytics/AnalyticsMatrix';
+import { EventCategorySummary } from '@/components/charts/EventCategorySummary';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -96,6 +97,7 @@ export default function EventsPage() {
   const { selectedSymbols, startDate, endDate, chartScale } = useAnalysisStore();
   const { timeRangeSelection } = useChartSelectionStore();
   const [filterOpen, setFilterOpen] = useState(true);
+  const [activeTable, setActiveTable] = useState<'events' | 'categories'>('events');
 
   // Event-specific filters
   const [selectedEventName, setSelectedEventName] = useState<string>('');
@@ -361,14 +363,45 @@ export default function EventsPage() {
             </div>
           </div>
 
-          {/* DATA TABLE */}
+          {/* DATA TABLE WITH TOGGLE */}
           <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-            <EventDataTable
-              data={data?.eventOccurrences || []}
-              symbol={selectedSymbols[0]}
-              mean={stats?.avgReturn || 0}
-              stdDev={stats?.stdDev || 1}
-            />
+            {/* TABLE TOGGLE */}
+            <div className="flex items-center gap-1 p-2 border-b border-slate-100 bg-slate-50">
+              {[
+                { id: 'events', label: 'Event Occurrences' },
+                { id: 'categories', label: 'Category Summary' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTable(tab.id as any)}
+                  className={cn(
+                    "px-4 py-2 text-xs font-medium rounded-md transition-colors",
+                    activeTable === tab.id
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white hover:shadow-sm"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* TABLE CONTENT */}
+            <div className="max-h-[500px] overflow-auto">
+              {activeTable === 'events' && (
+                <EventDataTable
+                  data={data?.eventOccurrences || []}
+                  symbol={selectedSymbols[0]}
+                  mean={stats?.avgReturn || 0}
+                  stdDev={stats?.stdDev || 1}
+                />
+              )}
+              {activeTable === 'categories' && (
+                <EventCategorySummary 
+                  data={data?.eventOccurrences || []} 
+                />
+              )}
+            </div>
           </div>
 
         </div>

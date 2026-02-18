@@ -17,6 +17,8 @@ import { useChartSelectionStore } from '@/store/chartSelectionStore';
 import { CumulativeChartWithDragSelect, ReturnBarChart } from '@/components/charts';
 import { AnalyticsMatrix } from '@/components/analytics/AnalyticsMatrix';
 import { AggregateChart } from '@/components/charts/AggregateChart';
+import { ChartResizeWrapper } from '@/components/charts/ChartResizeWrapper';
+import { DayOfWeekTable } from '@/components/charts/DayOfWeekTable';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -118,7 +120,7 @@ export default function DailyPage() {
   const [aggregateType, setAggregateType] = useState<'total' | 'avg' | 'max' | 'min'>('avg');
   
   // Data table toggle
-  const [activeTable, setActiveTable] = useState<'daily' | 'monthly' | 'yearly' | 'statistics'>('daily');
+  const [activeTable, setActiveTable] = useState<'daily' | 'dayOfWeek' | 'monthly' | 'yearly' | 'statistics'>('daily');
 
   // Fetch daily analysis data
   const { data, isLoading, refetch, isFetching } = useQuery({
@@ -333,34 +335,36 @@ export default function DailyPage() {
                 </div>
               </div>
               <div className="flex-1 w-full relative p-4">
-                {!data ? (
-                  <PlaceholderState />
-                ) : activeChart === 'cumulative' ? (
-                  <CumulativeChartWithDragSelect
-                    data={cumulativeData}
-                    chartScale={chartScale}
-                    chartColor="#10b981"
-                  />
-                ) : activeChart === 'yearly' ? (
-                  <YearlyOverlayChart
-                    data={symbolData?.chartData || []}
-                    symbol={symbol}
-                  />
-                ) : activeChart === 'aggregate' && aggregateData && aggregateData.length > 0 ? (
-                  <AggregateChart
-                    data={aggregateData}
-                    symbol={symbol}
-                    aggregateType={aggregateType}
-                    fieldType={aggregateField.replace(/^[a-z]/, (c) => c.toUpperCase()) as any}
-                    config={{ height: 320 }}
-                  />
-                ) : (
-                  <CumulativeChartWithDragSelect
-                    data={cumulativeData}
-                    chartScale={chartScale}
-                    chartColor="#10b981"
-                  />
-                )}
+                <ChartResizeWrapper>
+                  {!data ? (
+                    <PlaceholderState />
+                  ) : activeChart === 'cumulative' ? (
+                    <CumulativeChartWithDragSelect
+                      data={cumulativeData}
+                      chartScale={chartScale}
+                      chartColor="#10b981"
+                    />
+                  ) : activeChart === 'yearly' ? (
+                    <YearlyOverlayChart
+                      data={symbolData?.chartData || []}
+                      symbol={symbol}
+                    />
+                  ) : activeChart === 'aggregate' && aggregateData && aggregateData.length > 0 ? (
+                    <AggregateChart
+                      data={aggregateData}
+                      symbol={symbol}
+                      aggregateType={aggregateType}
+                      fieldType={aggregateField.replace(/^[a-z]/, (c) => c.toUpperCase()) as any}
+                      config={{ height: 320 }}
+                    />
+                  ) : (
+                    <CumulativeChartWithDragSelect
+                      data={cumulativeData}
+                      chartScale={chartScale}
+                      chartColor="#10b981"
+                    />
+                  )}
+                </ChartResizeWrapper>
               </div>
             </div>
 
@@ -384,14 +388,16 @@ export default function DailyPage() {
                 </div>
               </div>
               <div className="flex-1 w-full p-4 relative">
-                {data ? (
-                  <SuperimposedChart
-                    data={symbolData?.chartData || []}
-                    symbol={symbol}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-slate-300 text-xs">No Data</div>
-                )}
+                <ChartResizeWrapper>
+                  {data ? (
+                    <SuperimposedChart
+                      data={symbolData?.chartData || []}
+                      symbol={symbol}
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-slate-300 text-xs">No Data</div>
+                  )}
+                </ChartResizeWrapper>
               </div>
             </div>
 
@@ -404,16 +410,18 @@ export default function DailyPage() {
                 </div>
               </div>
               <div className="flex-1 w-full p-4 relative">
-                {patternReturnsData.length > 0 ? (
-                  <ReturnBarChart
-                    data={patternReturnsData}
-                    symbol={symbol}
-                    config={{ title: '', height: 240 }}
-                    color="#10b981"
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-slate-300 text-xs">No Data</div>
-                )}
+                <ChartResizeWrapper>
+                  {patternReturnsData.length > 0 ? (
+                    <ReturnBarChart
+                      data={patternReturnsData}
+                      symbol={symbol}
+                      config={{ title: '', height: 240 }}
+                      color="#10b981"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-slate-300 text-xs">No Data</div>
+                  )}
+                </ChartResizeWrapper>
               </div>
             </div>
           </div>
@@ -424,6 +432,7 @@ export default function DailyPage() {
             <div className="flex items-center gap-1 p-2 border-b border-slate-100 bg-slate-50">
               {[
                 { id: 'daily', label: 'Daily Data' },
+                { id: 'dayOfWeek', label: 'Day of Week' },
                 { id: 'monthly', label: 'Monthly' },
                 { id: 'yearly', label: 'Yearly' },
                 { id: 'statistics', label: 'Statistics' },
@@ -447,6 +456,12 @@ export default function DailyPage() {
             <div className="max-h-[400px] overflow-auto">
               {activeTable === 'daily' && (
                 <DailyDataTable 
+                  data={symbolData?.tableData || []} 
+                  symbol={symbol} 
+                />
+              )}
+              {activeTable === 'dayOfWeek' && (
+                <DayOfWeekTable 
                   data={symbolData?.tableData || []} 
                   symbol={symbol} 
                 />

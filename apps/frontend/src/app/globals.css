@@ -129,3 +129,44 @@
 .spinner {
   @apply animate-spin rounded-full border-2 border-muted border-t-primary;
 }
+
+/* Smooth Sidebar & Chart Animations */
+
+/* Prevent layout thrashing during animations */
+.smooth-layout {
+  contain: layout style paint;
+}
+
+/* Smooth width transitions for flex containers */
+.flex-smooth > * {
+  transition: flex-basis 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Chart container optimizations */
+.chart-container {
+  contain: layout style;
+  will-change: auto;
+}
+
+.chart-container.resizing {
+  will-change: contents;
+}
+
+/* Prevent text selection during resize */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* GPU acceleration helpers */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Prevent FOUC during hydration */
+[data-hydrated="false"] * {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
