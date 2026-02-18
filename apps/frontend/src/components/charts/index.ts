@@ -13,3 +13,4 @@ export { SuperimposedChart } from './SuperimposedChart';
 export { AdvancedDataTable } from './AdvancedDataTable';
 export { DataTable } from './DataTable';
 export { ChartWrapper } from './ChartWrapper';
+export { WeeklyDataTable } from './WeeklyDataTable';

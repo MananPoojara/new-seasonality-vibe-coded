@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { LoadingOverlay } from '@/components/ui/loading';
@@ -8,16 +8,18 @@ import { useNavigationLoading } from '@/hooks/useNavigationLoading';
 import { 
   BarChart3, 
   Calendar, 
-  TrendingUp, 
-  PieChart, 
   Zap,
   Search,
-  Target,
   Layers,
   ShoppingCart,
   Settings,
   LogOut,
-  User
+  Sparkles,
+  LineChart,
+  CalendarDays,
+  CalendarRange,
+  Vote,
+  TestTube
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,19 +27,37 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const navigationItems = [
-  { icon: Calendar, label: 'Daily', href: '/dashboard/daily', color: 'blue' },
-  { icon: BarChart3, label: 'Weekly', href: '/dashboard/weekly', color: 'emerald' },
-  { icon: TrendingUp, label: 'Monthly', href: '/dashboard/monthly', color: 'purple' },
-  { icon: PieChart, label: 'Yearly', href: '/dashboard/yearly', color: 'orange' },
-  { icon: Zap, label: 'Events', href: '/dashboard/events', color: 'violet' },
-  { icon: Target, label: 'Scenario', href: '/dashboard/scenario', color: 'yellow' },
-  { icon: Target, label: 'Election', href: '/dashboard/election', color: 'red' },
-  { icon: Search, label: 'Scanner', href: '/dashboard/scanner', color: 'cyan' },
-  { icon: Layers, label: 'Backtester', href: '/dashboard/backtester', color: 'pink' },
-  { icon: Target, label: 'Phenomena', href: '/dashboard/phenomena', color: 'teal' },
-  { icon: ShoppingCart, label: 'Basket', href: '/dashboard/basket', color: 'indigo' },
+const navigationGroups = [
+  {
+    title: 'Analysis',
+    items: [
+      { icon: Calendar, label: 'Daily', href: '/dashboard/daily', color: '#3b82f6' },
+      { icon: CalendarDays, label: 'Weekly', href: '/dashboard/weekly', color: '#f59e0b' },
+      { icon: CalendarRange, label: 'Monthly', href: '/dashboard/monthly', color: '#8b5cf6' },
+      { icon: Layers, label: 'Yearly', href: '/dashboard/yearly', color: '#f97316' },
+      { icon: Zap, label: 'Events', href: '/dashboard/events', color: '#7c3aed' },
+    ]
+  },
+  {
+    title: 'Strategy',
+    items: [
+      { icon: LineChart, label: 'Scenario', href: '/dashboard/scenario', color: '#eab308' },
+      { icon: Vote, label: 'Election', href: '/dashboard/election', color: '#ef4444' },
+      { icon: Sparkles, label: 'Phenomena', href: '/dashboard/phenomena', color: '#14b8a6' },
+      { icon: TestTube, label: 'Backtester', href: '/dashboard/backtester', color: '#ec4899' },
+    ]
+  },
+  {
+    title: 'Tools',
+    items: [
+      { icon: Search, label: 'Scanner', href: '/dashboard/scanner', color: '#06b6d4' },
+      { icon: ShoppingCart, label: 'Basket', href: '/dashboard/basket', color: '#6366f1' },
+      { icon: BarChart3, label: 'Charts', href: '/dashboard/charts', color: '#10b981' },
+    ]
+  }
 ];
+
+const allNavigationItems = navigationGroups.flatMap(g => g.items);
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isNavigating, setIsNavigating] = useState(false);
@@ -52,85 +72,139 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     router.push('/login');
   };
 
+  const getPageColor = useMemo(() => {
+    const activeItem = allNavigationItems.find(item => pathname === item.href);
+    return activeItem?.color || '#6366f1';
+  }, [pathname]);
+
+  const handleNavigation = (href: string) => {
+    router.push(href);
+  };
+
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
       <LoadingOverlay isVisible={isNavigating} text="Loading..." />
       
-      {/* LEFT NAVIGATION SIDEBAR */}
-      <aside className="w-16 bg-white border-r border-slate-200 flex flex-col items-center py-4">
+      {/* LEFT NAVIGATION SIDEBAR - Fixed narrow width, no collapse */}
+      <aside className="flex flex-col h-full w-[200px] bg-white border-r border-slate-200 flex-shrink-0 relative z-30">
         {/* Logo */}
-        <div className="mb-8">
-          <div className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-            pathname.includes('/weekly') ? "bg-emerald-600" :
-            pathname.includes('/daily') ? "bg-blue-600" :
-            pathname.includes('/monthly') ? "bg-purple-600" :
-            pathname.includes('/yearly') ? "bg-orange-600" :
-            "bg-indigo-600"
-          )}>
-            <BarChart3 className="h-6 w-6 text-white" />
+        <div className="h-14 flex items-center border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/50 px-3">
+          <div 
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+            style={{
+              background: `linear-gradient(135deg, ${getPageColor} 0%, ${getPageColor}dd 100%)`,
+            }}
+          >
+            <BarChart3 className="h-4 w-4 text-white" />
+          </div>
+          <div className="ml-2.5 overflow-hidden">
+            <span className="font-bold text-slate-800 text-sm whitespace-nowrap block">
+              Seasonality
+            </span>
+            <span className="text-[10px] text-slate-400 whitespace-nowrap">
+              Analytics
+            </span>
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 flex flex-col gap-2 w-full px-2">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            
-            // Color mapping for each page
-            const colorClasses = {
-              blue: { bg: 'bg-blue-50', text: 'text-blue-600', indicator: 'bg-blue-600' },
-              emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', indicator: 'bg-emerald-600' },
-              purple: { bg: 'bg-purple-50', text: 'text-purple-600', indicator: 'bg-purple-600' },
-              orange: { bg: 'bg-orange-50', text: 'text-orange-600', indicator: 'bg-orange-600' },
-              violet: { bg: 'bg-violet-50', text: 'text-violet-600', indicator: 'bg-violet-600' },
-              yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', indicator: 'bg-yellow-600' },
-              red: { bg: 'bg-red-50', text: 'text-red-600', indicator: 'bg-red-600' },
-              cyan: { bg: 'bg-cyan-50', text: 'text-cyan-600', indicator: 'bg-cyan-600' },
-              pink: { bg: 'bg-pink-50', text: 'text-pink-600', indicator: 'bg-pink-600' },
-              teal: { bg: 'bg-teal-50', text: 'text-teal-600', indicator: 'bg-teal-600' },
-              indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', indicator: 'bg-indigo-600' },
-            };
-            
-            const colors = colorClasses[item.color as keyof typeof colorClasses] || colorClasses.indigo;
-            
-            return (
-              <button
-                key={item.href}
-                onClick={() => router.push(item.href)}
-                className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center transition-all relative group",
-                  isActive 
-                    ? `${colors.bg} ${colors.text}` 
-                    : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-                )}
-                title={item.label}
-              >
-                <Icon className="h-5 w-5" />
-                
-                {/* Tooltip */}
-                <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
-                  {item.label}
-                </div>
-                
-                {/* Active Indicator */}
-                {isActive && (
-                  <div className={cn("absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r", colors.indicator)} />
-                )}
-              </button>
-            );
-          })}
+        {/* Navigation */}
+        <nav className="flex-1 py-3 px-1.5 overflow-y-auto overflow-x-hidden">
+          {navigationGroups.map((group, groupIndex) => (
+            <div key={group.title} className={cn("mb-3", groupIndex > 0 && "mt-5")}>
+              <div className="px-2 mb-1.5">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                  {group.title}
+                </span>
+              </div>
+              
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  
+                  return (
+                    <button
+                      key={item.href}
+                      onClick={() => handleNavigation(item.href)}
+                      className={cn(
+                        "w-full h-9 rounded-lg flex items-center relative overflow-hidden transition-all duration-150 px-1.5",
+                        isActive ? "bg-slate-100" : "hover:bg-slate-50"
+                      )}
+                    >
+                      {isActive && (
+                        <div 
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                      )}
+                      
+                      <div 
+                        className={cn(
+                          "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
+                          isActive ? "text-white" : "text-slate-400 bg-slate-100"
+                        )}
+                        style={isActive ? { backgroundColor: item.color } : {}}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      
+                      <span className={cn(
+                        "ml-2 text-xs font-medium whitespace-nowrap",
+                        isActive ? "text-slate-800" : "text-slate-500"
+                      )}>
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Bottom Section - Empty now, user profile moved to header */}
-        <div className="flex flex-col gap-2 w-full px-2 pt-4 border-t border-slate-200">
-          {/* Empty - all controls moved to header */}
+        {/* Bottom Section */}
+        <div className="p-1.5 border-t border-slate-100 bg-slate-50/50">
+          <button className="h-9 rounded-lg flex items-center hover:bg-white transition-colors px-1.5 w-full">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 bg-slate-100">
+              <Settings className="h-3.5 w-3.5" />
+            </div>
+            <span className="ml-2 text-xs font-medium text-slate-500 whitespace-nowrap">
+              Settings
+            </span>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="h-9 rounded-lg flex items-center hover:bg-white transition-colors mt-0.5 px-1.5 w-full"
+          >
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 bg-slate-100">
+              <LogOut className="h-3.5 w-3.5" />
+            </div>
+            <span className="ml-2 text-xs font-medium text-slate-500 whitespace-nowrap">
+              Logout
+            </span>
+          </button>
+
+          {/* User Profile */}
+          <div className="mt-2 p-1.5 rounded-xl flex items-center bg-white border border-slate-100 shadow-sm w-full">
+            <div 
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+              style={{
+                background: `linear-gradient(135deg, ${getPageColor} 0%, ${getPageColor}dd 100%)`,
+              }}
+            >
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="ml-2 overflow-hidden flex-1 min-w-0">
+              <div className="text-xs font-semibold text-slate-700 truncate">{user?.name || 'User'}</div>
+              <div className="text-[9px] text-slate-400 truncate">{user?.email || 'user@example.com'}</div>
+            </div>
+          </div>
         </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden min-w-0">
         {children}
       </main>
     </div>
